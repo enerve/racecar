@@ -20,19 +20,23 @@ class Environment(object):
     It can also convert the Car's reality back a simplified "state" encoding
     for the Driver.
     '''
+    
+    NUM_MILESTONES = 27   # Points at which rewards will be given
 
-    def __init__(self, track, car, num_milestones, should_record=False):
+    def __init__(self, track, car, num_junctures, should_record=False):
         '''
         Constructor
         '''
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
 
-        self.num_milestones = num_milestones
+        self.num_junctures = num_junctures
+        self.num_milestones = Environment.NUM_MILESTONES
         
         self.track = track
         self.car = car
         self.car.restart(track, should_record)
+        self.curr_juncture = 0
         self.curr_milestone = 0
         self.curr_time = 0
         self.reached_finish = False
@@ -45,46 +49,58 @@ class Environment(object):
             Returns reward and next state
         '''
         
-        #steer, accel = A
-        #self.logger.debug("  Step: %d, %d", steer, accel)
         self.car.take_action(A)
-        self.car.move()
-        self.curr_time += 1
-        R = -1
 
-
+        next_juncture = (self.curr_juncture + 1) % self.num_junctures                
         next_milestone = (self.curr_milestone + 1) % self.num_milestones
-        while self.track.is_inside(self.car.location) and \
-                self.track.within_section(self.car.location, self.curr_milestone,
-                                          next_milestone):
+
+        # Run physics until next juncture, collecting rewards along the way
+        R = 0
+        while True:
             #self.logger.debug("  moving further inside")
             self.car.move()
             self.curr_time += 1
             R += -1
+            if not self.track.within_milestone(self.car.location, 
+                                               self.curr_milestone,
+                                               next_milestone):
+                # milestone reached
+                self.curr_milestone += 1
+                next_milestone = (self.curr_milestone + 1) % self.num_milestones
+                R += 10
+            if not self.track.is_inside(self.car.location):
+                # Car has crashed!
+                # Think of this R as a penalty for untravelled track (plus 5000)
+                R += 5000 * self.track.progress_made(self.car.location)
         
-        if not self.track.is_inside(self.car.location):
-            #R += -100
-            R += 5000 * self.track.progress_made(self.car.location)
-    
-            return (R, None)
-        else:
-            # milestone reached
-            R += 10
-            self.curr_milestone += 1
-            if self.curr_milestone == self.num_milestones:
+                return (R, None)
+            if not self.track.within_juncture(self.car.location, 
+                                              self.curr_juncture,
+                                              next_juncture):
+                # Car location has moved beyond juncture
+                break
+        
+
+        # Advance curr juncture to cover curr location
+        while True:
+            self.curr_juncture += 1
+            next_juncture = (self.curr_juncture + 1) % self.num_junctures
+            
+            # Reached finish line?
+            if self.curr_juncture == self.num_junctures:
                 self.reached_finish = True
                 R += 5000 * 1 # 100 percent
                 return (R, None)
 
-            next_milestone = (self.curr_milestone + 1) % self.num_milestones
-            while not self.track.within_section(self.car.location,
-                                             self.curr_milestone,
-                                             next_milestone):
-                self.logger.debug("jumped section")
-                self.curr_milestone += 1
-                next_milestone = (self.curr_milestone + 1) % self.num_milestones
-                #R += 100
+            # if curr juncture now covers location, stop advancing juncture
+            if self.track.within_juncture(self.car.location,
+                                          self.curr_juncture,
+                                          next_juncture):
+                break
                 
+            # Skip through bypassed junctures
+            self.logger.debug("jumping section")
+            
         return (R, self.state_encoding())
     
     def has_reached_finish(self):
@@ -96,10 +112,10 @@ class Environment(object):
     def state_encoding(self):
         if self.car is None:
             return None
-        m = self.curr_milestone
+        j = self.curr_juncture
         l = self.track.lane_encoding(self.car.location)
         v, d = self.car.state_encoding()
-        return m, l, v, d
+        return j, l, v, d
 
     def report_history(self):
         if not self.should_record:

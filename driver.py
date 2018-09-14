@@ -20,7 +20,7 @@ class Driver(object):
     An agent that controls the race car
     '''
 
-    NUM_MILESTONES = 28
+    NUM_JUNCTURES = 28
     NUM_LANES = 5
     MAX_SPEED = 3
     NUM_DIRECTIONS = 20
@@ -41,33 +41,37 @@ class Driver(object):
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
         
+        # Q is the learned value of a state/action
         if load_filename is not None:
             stored_Q = util.load(load_filename)
-            self.Q = stored_Q.reshape((Driver.NUM_MILESTONES,
+            self.Q = stored_Q.reshape((Driver.NUM_JUNCTURES,
                                        Driver.NUM_LANES,
                                        Driver.MAX_SPEED,
                                        Driver.NUM_DIRECTIONS,
                                        Driver.NUM_STEER_POSITIONS,
                                        Driver.NUM_ACCEL_POSITIONS))
         else:
-            self.Q = np.zeros((Driver.NUM_MILESTONES,
+            self.Q = np.zeros((Driver.NUM_JUNCTURES,
                                Driver.NUM_LANES,
                                Driver.MAX_SPEED,
                                Driver.NUM_DIRECTIONS,
                                Driver.NUM_STEER_POSITIONS,
                                Driver.NUM_ACCEL_POSITIONS))
                            
-        self.C = np.zeros((Driver.NUM_MILESTONES,
+        # C is the count of visits to state/action
+        self.C = np.zeros((Driver.NUM_JUNCTURES,
                            Driver.NUM_LANES,
                            Driver.MAX_SPEED,
                            Driver.NUM_DIRECTIONS,
                            Driver.NUM_STEER_POSITIONS,
                            Driver.NUM_ACCEL_POSITIONS), dtype=np.int32)
-        self.N = np.zeros((Driver.NUM_MILESTONES,
+        # C is the count of visits to state
+        self.N = np.zeros((Driver.NUM_JUNCTURES,
                            Driver.NUM_LANES,
                            Driver.MAX_SPEED,
                            Driver.NUM_DIRECTIONS), dtype=np.int32)
-        self.Rs = np.zeros((Driver.NUM_MILESTONES), dtype=np.float)
+        # Rs is the average reward at juncture (for statistics)
+        self.Rs = np.zeros((Driver.NUM_JUNCTURES), dtype=np.float)
 
     def pick_action(self, S, run_best):  
         if run_best:
@@ -130,13 +134,13 @@ class Driver(object):
     def plotQ(self, m, axes, t_suffix):
         M = m
         Q = self.Q_to_plot(m, axes)
-        util.heatmap(Q, None, "Q total per milestone %s" % t_suffix, pref="Q")
+        util.heatmap(Q, None, "Q total per juncture %s" % t_suffix, pref="Q")
         
         C = self.C_to_plot(m, axes)    
-        util.heatmap(C, None, "Total updates per milestone %s" % t_suffix, pref="C")
+        util.heatmap(C, None, "Total updates per juncture %s" % t_suffix, pref="C")
 
     def dumpQ(self, pref=""):
-        M = Driver.NUM_MILESTONES
+        M = Driver.NUM_JUNCTURES
         util.dump(self.Q.reshape(M, -1), "Q_%s_%s" % (M, pref))
         #util.dump(self.C.reshape(M, -1), "C_%s" % M)
         #util.dump(self.N.reshape(M, -1), "N_%s" % M)
@@ -144,7 +148,7 @@ class Driver(object):
     def run_episode(self, track, car, run_best=False):
         environment = Environment(track,
                                   car,
-                                  Driver.NUM_MILESTONES,
+                                  Driver.NUM_JUNCTURES,
                                   should_record=run_best)
         S = environment.state_encoding() # 0 2 0 0
         total_R = 0
@@ -175,47 +179,48 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
     
     random.seed(seed)
     
-    # track counts of last milestone reached
+    # track counts of last juncture reached
     smooth = num_episodes // 100
-    count_m = np.zeros((smooth, Driver.NUM_MILESTONES + 1), dtype=np.int32)
-    Eye = np.eye(Driver.NUM_MILESTONES + 1)
+    count_m = np.zeros((smooth, Driver.NUM_JUNCTURES + 1), dtype=np.int32)
+    Eye = np.eye(Driver.NUM_JUNCTURES + 1)
     # track #steps/time-taken by bestpath, as iterations progress
     stat_bestpath_times = []
     stat_e_bp = []
     
-    stat_m = [[] for _ in range(Driver.NUM_MILESTONES + 1)]
+    stat_m = [[] for _ in range(Driver.NUM_JUNCTURES + 1)]
     stat_qm = []
     stat_cm = []
     stat_rm = []
     stat_debug_qv = []
     stat_debug_n = []
-    q_plotter = util.Plotter("Q value at milestones along lanes")
-    qx_plotter = util.Plotter("Max Q value at milestones along lanes")
-    c_plotter = util.Plotter("C value at milestones along lanes")
+    q_plotter = util.Plotter("Q value at junctures along lanes")
+    qx_plotter = util.Plotter("Max Q value at junctures along lanes")
+    c_plotter = util.Plotter("C value at junctures along lanes")
     stat_e_100 = []
     stat_e_200 = []
     stat_e_1000 = []
         
     logger.debug("Starting")
     best_R = -10000
-    best_MS = 9
+    best_Jc = 9
     
     for ep in range(num_episodes):
         R, environment = driver.run_episode(track, car)
 
             
-        count_m[ep % smooth] = Eye[environment.curr_milestone]
+        count_m[ep % smooth] = Eye[environment.curr_juncture]
         
-        if environment.curr_milestone >= 10:
+        if environment.curr_juncture >= 10:
             if R > best_R:
-                logger.debug("Ep %d  Milestone %d reached with R=%d",
-                                  ep, environment.curr_milestone, R)
+                logger.debug("Ep %d  Juncture %d reached with R=%d T=%d",
+                                  ep, environment.curr_juncture, R,
+                                  environment.total_time_taken())
                 best_R = R
-                best_MS = environment.curr_milestone
+                best_Jc = environment.curr_juncture
 #                     environment.report_history()
 #                     environment.play_movie()
 
-#             if environment.curr_milestone >= 10:
+#             if environment.curr_juncture >= 10:
 #                 ah = environment.car.action_history
 #                 pattern = [2]
 #                 still_matching = True
@@ -226,8 +231,8 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
 #                         still_matching = False
 #                         break;
 #                 if still_matching:
-#                     logger.debug("Ep %d  Milestone %d reached with R=%d",
-#                                        ep, environment.curr_milestone, R)
+#                     logger.debug("Ep %d  juncture %d reached with R=%d",
+#                                        ep, environment.curr_juncture, R)
 #                     environment.report_history()
 #                     environment.play_movie()
 
@@ -236,7 +241,7 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
             for i, c in enumerate(count_m.sum(axis=0)):
                 stat_m[i].append(c)
 #                     stat_ep[i].append(ep)
-            #count_m = np.zeros((Driver.NUM_MILESTONES + 1), dtype=np.int32)
+            #count_m = np.zeros((Driver.NUM_JUNCTURES + 1), dtype=np.int32)
 
         if ep > 0 and ep % (num_episodes // 100) == 0:
             stat_e_100.append(ep)
@@ -253,8 +258,7 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
             an = driver.N[3, 1, 2, 2]  # what is chosen best in the end
 #             bn = driver.C[3, 1, 2, 2, 0, 1]  # what i hoped for
 #             cn = driver.C[3, 1, 2, 2, 0, 2]  #     or this
-            N0 = 2500
-            an = N0 / (N0 + an)
+            an = driver.explorate / (driver.explorate + an)
             stat_debug_n.append([an])
             
         if ep > 0 and ep % (num_episodes // 100) == 99:
@@ -281,7 +285,7 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
 #                 for i in range(max(0, best_MS - 9), best_MS + 1):
 #                     lines.append(stat_m[i])
 #                     labels.append("ms %d" % i)
-#                 util.plot(lines, labels, "Max milestone reached", pref="ms%d" %(ep // 1000))
+#                 util.plot(lines, labels, "Max juncture reached", pref="ms%d" %(ep // 1000))
 
         if ep > 0 and ep % 10000 == 0:
             logger.debug("Ep %d ", ep)
@@ -309,39 +313,39 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
     
 #     S_qm = np.array(stat_qm).T
 #     logger.debug("stat_qm: \n%s", S_qm.astype(np.int32))
-#     util.heatmap(S_qm, (0, EPISODES, Driver.NUM_MILESTONES, 0),
-#                  "Total Q per milestone over epochs", pref="QM")
+#     util.heatmap(S_qm, (0, EPISODES, Driver.NUM_JUNCTURES, 0),
+#                  "Total Q per juncture over epochs", pref="QM")
 #        
-#     #S_dq = S_qm[1:, :] - S_qm[:-1, :] # Q diff milestone to next milestone
+#     #S_dq = S_qm[1:, :] - S_qm[:-1, :] # Q diff juncture to next juncture
 #     S_dq = S_qm[:, 1:] - S_qm[:, :-1] # Q diff epoch to next epoch
 #     logger.debug("stat_dq: \n%s", S_dq.shape)
 #     logger.debug("stat_dq: \n%s", S_dq.astype(np.int32))
-#     util.heatmap(S_dq, (0, EPISODES, Driver.NUM_MILESTONES, 0),
-#                  "Diff Q per milestone over epochs", pref="DQ")
+#     util.heatmap(S_dq, (0, EPISODES, Driver.NUM_JUNCTURES, 0),
+#                  "Diff Q per juncture over epochs", pref="DQ")
 #  
 #     S_cm = np.array(stat_cm).T
 #     logger.debug("stat_cm: \n%s", S_cm.astype(np.int32))
-#     util.heatmap(S_cm, (0, EPISODES, Driver.NUM_MILESTONES, 0),
-#                  "Exploration per milestone over epochs", pref="CM")
+#     util.heatmap(S_cm, (0, EPISODES, Driver.NUM_JUNCTURES, 0),
+#                  "Exploration per juncture over epochs", pref="CM")
 # 
 #     S_rm = np.array(stat_rm).T
 #     logger.debug("stat_rm: \n%s", (100*S_rm).astype(np.int32))
-#     util.heatmap(S_rm, (0, EPISODES, Driver.NUM_MILESTONES, 0),
-#                  "Avg reward at milestone over epochs", cmap='winter',
+#     util.heatmap(S_rm, (0, EPISODES, Driver.NUM_JUNCTURES, 0),
+#                  "Avg reward at juncture over epochs", cmap='winter',
 #                  pref="RM")
  
 #     S_rm = S_rm[0:10]
 #     labels = []
 #     for i in range(len(S_rm)):
 #         labels.append("ms %d" % i)
-#     util.plot(S_rm, stat_e_100, labels, "Milestone reward", pref="rm")
+#     util.plot(S_rm, stat_e_100, labels, "Juncture reward", pref="rm")
 
 #     lines = []
 #     labels = []
 #     for i in range(len(stat_m)):
 #         lines.append(stat_m[i])
 #         labels.append("ms %d" % i)            
-#     util.plot(lines, stat_e_1000, labels, "Max milestone reached", pref="ms")
+#     util.plot(lines, stat_e_1000, labels, "Max juncture reached", pref="ms")
 
     return (stat_bestpath_times, stat_e_bp)
 
@@ -389,7 +393,7 @@ MY_IDEAL_A = [
 
 
 def drive_manual(track, car):
-    environment = Environment(track, car, Driver.NUM_MILESTONES,
+    environment = Environment(track, car, Driver.NUM_JUNCTURES,
                               should_record=True)
 
     actions = MY_IDEAL_A
@@ -415,42 +419,43 @@ if __name__ == '__main__':
     # --------------
     
     RADIUS = 98
-    track = CircleTrack((0, 0), RADIUS, 20, Driver.NUM_MILESTONES, Driver.NUM_LANES)
+    track = CircleTrack((0, 0), RADIUS, 20, Driver.NUM_JUNCTURES,
+                        Environment.NUM_MILESTONES, Driver.NUM_LANES)
     NUM_SPEEDS = 3
     car = Car(Driver.NUM_DIRECTIONS, NUM_SPEEDS)
     
     
     #original_driver = Driver(alpha=1, gamma=1, explorate=2500)
-    #driver = Driver(alpha=1, gamma=1, explorate=2500)
+    driver = Driver(alpha=1, gamma=1, explorate=2500)
     #driver = Driver(alpha=0.2, gamma=1, load_filename="RC_qlearn_652042_Q_28_.csv")
-#     train(driver, track, car, 10*1000)
-#     play_best(driver, track, car)
+    train(driver, track, car, 200*1000)
+    play_best(driver, track, car)
             
     # drive_manual()
 
     # --------- CV ---------
-    explorates = [10, 100, 1000, 10000]
-    stats_bp_times = []
-    stats_e_bp = []
-    stats_labels = []
-    num_episodes = 300 * 1000
-    for explorate in explorates:
-        logger.debug("--- Explorate=%d ---" % explorate)
-        for i in range(3):
-            seed = (100 + 53*i)
-            pref = "%d_%d" % (explorate, seed)
-            driver = Driver(alpha=1, gamma=1, explorate=explorate)
-            stat_bestpath_times, stat_e_bp = \
-                train(driver, track, car, num_episodes, seed=seed, pref=pref)
-            stats_bp_times.append(stat_bestpath_times)
-            stats_e_bp.append(stat_e_bp)
-            stats_labels.append("N0=%d seed=%d" % (explorate, seed))
-            logger.debug("bestpath: %s", stat_bestpath_times)
-            logger.debug("stat_e: %s", stat_e_bp)
-            play_best(driver, track, car, should_play_movie=False,
-                      pref=pref)
-    util.plot_all(stats_bp_times, stats_e_bp, stats_labels,
-                  title="Time taken by best path as of epoch", pref="BestTimeTaken")
+#     explorates = [10, 100, 1000, 10000]
+#     stats_bp_times = []
+#     stats_e_bp = []
+#     stats_labels = []
+#     num_episodes = 300 * 1000
+#     for explorate in explorates:
+#         logger.debug("--- Explorate=%d ---" % explorate)
+#         for i in range(3):
+#             seed = (100 + 53*i)
+#             pref = "%d_%d" % (explorate, seed)
+#             driver = Driver(alpha=1, gamma=1, explorate=explorate)
+#             stat_bestpath_times, stat_e_bp = \
+#                 train(driver, track, car, num_episodes, seed=seed, pref=pref)
+#             stats_bp_times.append(stat_bestpath_times)
+#             stats_e_bp.append(stat_e_bp)
+#             stats_labels.append("N0=%d seed=%d" % (explorate, seed))
+#             logger.debug("bestpath: %s", stat_bestpath_times)
+#             logger.debug("stat_e: %s", stat_e_bp)
+#             play_best(driver, track, car, should_play_movie=False,
+#                       pref=pref)
+#     util.plot_all(stats_bp_times, stats_e_bp, stats_labels,
+#                   title="Time taken by best path as of epoch", pref="BestTimeTaken")
     
     
 
