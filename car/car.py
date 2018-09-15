@@ -6,6 +6,7 @@ Created on Sep 13, 2018
 
 import logging
 import math
+import numpy as np
 
 class Car():
     
@@ -73,11 +74,8 @@ class Car():
         #self.logger.debug("direction=%d .. d=%d", self.direction, d)
         return v, d
 
-    def draw(self, location, image):
-        H, W = image.shape
-        x, y = location
-        x_ = int(x + W / 2)
-        y_ = int(-y + H / 2)
-        color = 200
+    def draw(self, coordinates, A):
+        x, y = coordinates
+        color = np.array([200, 0, 0])
         #self.logger.debug("%s %s", i, j)
-        image[y_, x_] = color
+        A[y, x] = color
