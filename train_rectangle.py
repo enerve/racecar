@@ -7,42 +7,59 @@ Created on Sep 14, 2018
 import logging
 
 from car import Car
-from track import LineTrack
 from driver import Driver
+from track import LineTrack
 import cmd_line
 import log
 import util
 import trainer
 
-if __name__ == '__main__':
-    
+def main():
     args = cmd_line.parse_args()
 
     util.prefix_init(args)
     util.pre_problem = 'RC'
 
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger()
     log.configure_logger(logger, "RaceCar FS rectangle")
     logger.setLevel(logging.DEBUG)
 
     # --------------
     
     points = [
-            (120, 180),
-            (210, 180),
+            (120, 40),
             (210, 40),
-            (30, 40),
-            (30, 180)
+            (210, 180),
+            (30, 180),
+            (30, 40)
         ]
-    track = LineTrack(points, 20)
-    track.draw()
+    NUM_JUNCTURES = 50
+    NUM_MILESTONES = 50
+    NUM_LANES = 5
+    MAX_SPEED = NUM_SPEEDS = 3
+    NUM_DIRECTIONS = 20
+    
+    NUM_STEER_POSITIONS = 3
+    NUM_ACCEL_POSITIONS = 3
+
+    WIDTH = 20
+    track = LineTrack(points, WIDTH, NUM_JUNCTURES, NUM_MILESTONES,
+                      NUM_LANES)
     
     NUM_SPEEDS = 3
-    car = Car(Driver.NUM_DIRECTIONS, NUM_SPEEDS)
+    car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
     
-    driver = Driver(alpha=1, gamma=1, explorate=2500)
-    trainer.train(driver, track, car, 2*1000)
-    #trainer.play_best(driver, track, car)
+    driver = Driver(1, # alpha
+                    1, # gamma
+                    100, # explorate
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS)
+    trainer.train(driver, track, car, 100*1000)
+    trainer.play_best(driver, track, car)
              
 
     # --------- CV ---------
@@ -69,4 +86,5 @@ if __name__ == '__main__':
 #     util.plot_all(stats_bp_times, stats_e_bp, stats_labels,
 #                   title="Time taken by best path as of epoch", pref="BestTimeTaken")
     
-    
+if __name__ == '__main__':
+    main()

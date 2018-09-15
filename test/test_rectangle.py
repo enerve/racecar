@@ -36,13 +36,21 @@ def test():
             (30, 40)
         ]
     NUM_JUNCTURES = 50
+    NUM_MILESTONES = 50
+    NUM_LANES = 5
+    MAX_SPEED = NUM_SPEEDS = 3
+    NUM_DIRECTIONS = 20
+    
+    NUM_STEER_POSITIONS = 3
+    NUM_ACCEL_POSITIONS = 3
+
     WIDTH = 20
-    track = LineTrack(points, WIDTH, NUM_JUNCTURES, Environment.NUM_MILESTONES,
-                      Driver.NUM_LANES)
+    track = LineTrack(points, WIDTH, NUM_JUNCTURES, NUM_MILESTONES,
+                      NUM_LANES)
     #track.draw()
     
     NUM_SPEEDS = 3
-    car = Car(Driver.NUM_DIRECTIONS, NUM_SPEEDS)
+    car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
 
     MY_IDEAL_A = [
             (1, 2),

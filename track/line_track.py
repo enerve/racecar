@@ -16,7 +16,7 @@ def dot(v1, v2):
 
 class LineTrack(Track):
     '''
-    classdocs
+    A track defined by a loop of connected lines.
     '''
 
     def __init__(self, points, width, num_junctures, num_milestones,
@@ -150,7 +150,7 @@ class LineTrack(Track):
                 m >= milestone_a
     
     def lane_encoding(self, anchor):
-        return math.floor(anchor['leftness'] * self.num_lanes / self.width)
+        return math.floor(anchor['leftness'] * self.num_lanes)
 
     def location_to_coordinates(self, location):
         ''' Return image coordinates for real-world geometric location

@@ -13,18 +13,18 @@ import util
 
 class Driver(object):
     '''
-    An agent that controls the race car
+    An agent that learns to drive a car along a track, optimizing using 
+    Q-learning
     '''
 
-    NUM_JUNCTURES = 28
-    NUM_LANES = 5
-    MAX_SPEED = 3
-    NUM_DIRECTIONS = 20
-    
-    NUM_STEER_POSITIONS = 3
-    NUM_ACCEL_POSITIONS = 3
-
-    def __init__(self, alpha, gamma, explorate, load_filename=None):
+    def __init__(self, alpha, gamma, explorate,
+                 num_junctures,
+                 num_lanes,
+                 num_speeds,
+                 num_directions,
+                 num_steer_positions,
+                 num_accel_positions,
+                 load_filename=None):
         '''
         Constructor
         '''
@@ -37,37 +37,44 @@ class Driver(object):
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
         
+        self.num_junctures = num_junctures
+        self.num_lanes = num_lanes
+        self.num_speeds = num_speeds
+        self.num_directions = num_directions
+        self.num_steer_positions = num_steer_positions
+        self.num_accel_positions = num_accel_positions
+
         # Q is the learned value of a state/action
         if load_filename is not None:
             stored_Q = util.load(load_filename)
-            self.Q = stored_Q.reshape((Driver.NUM_JUNCTURES,
-                                       Driver.NUM_LANES,
-                                       Driver.MAX_SPEED,
-                                       Driver.NUM_DIRECTIONS,
-                                       Driver.NUM_STEER_POSITIONS,
-                                       Driver.NUM_ACCEL_POSITIONS))
+            self.Q = stored_Q.reshape((num_junctures,
+                                       num_lanes,
+                                       num_speeds,
+                                       num_directions,
+                                       num_steer_positions,
+                                       num_accel_positions))
         else:
-            self.Q = np.zeros((Driver.NUM_JUNCTURES,
-                               Driver.NUM_LANES,
-                               Driver.MAX_SPEED,
-                               Driver.NUM_DIRECTIONS,
-                               Driver.NUM_STEER_POSITIONS,
-                               Driver.NUM_ACCEL_POSITIONS))
+            self.Q = np.zeros((num_junctures,
+                               num_lanes,
+                               num_speeds,
+                               num_directions,
+                               num_steer_positions,
+                               num_accel_positions))
                            
         # C is the count of visits to state/action
-        self.C = np.zeros((Driver.NUM_JUNCTURES,
-                           Driver.NUM_LANES,
-                           Driver.MAX_SPEED,
-                           Driver.NUM_DIRECTIONS,
-                           Driver.NUM_STEER_POSITIONS,
-                           Driver.NUM_ACCEL_POSITIONS), dtype=np.int32)
+        self.C = np.zeros((num_junctures,
+                           num_lanes,
+                           num_speeds,
+                           num_directions,
+                           num_steer_positions,
+                           num_accel_positions), dtype=np.int32)
         # C is the count of visits to state
-        self.N = np.zeros((Driver.NUM_JUNCTURES,
-                           Driver.NUM_LANES,
-                           Driver.MAX_SPEED,
-                           Driver.NUM_DIRECTIONS), dtype=np.int32)
+        self.N = np.zeros((num_junctures,
+                           num_lanes,
+                           num_speeds,
+                           num_directions), dtype=np.int32)
         # Rs is the average reward at juncture (for statistics)
-        self.Rs = np.zeros((Driver.NUM_JUNCTURES), dtype=np.float)
+        self.Rs = np.zeros((num_junctures), dtype=np.float)
 
     def pick_action(self, S, run_best):  
         if run_best:
@@ -91,9 +98,9 @@ class Driver(object):
             #                      steer, accel, As[steer, accel], S)
         else:
             r = random.randrange(
-                Driver.NUM_STEER_POSITIONS * Driver.NUM_ACCEL_POSITIONS)
-            steer = r % Driver.NUM_STEER_POSITIONS
-            accel = r // Driver.NUM_STEER_POSITIONS
+                self.num_steer_positions * self.num_accel_positions)
+            steer = r % self.num_steer_positions
+            accel = r // self.num_steer_positions
         
         return (steer, accel)
     
@@ -112,7 +119,7 @@ class Driver(object):
     def run_episode(self, track, car, run_best=False):
         environment = Environment(track,
                                   car,
-                                  Driver.NUM_JUNCTURES,
+                                  self.num_junctures,
                                   should_record=run_best)
         S = environment.state_encoding() # 0 2 0 0
         total_R = 0
@@ -136,9 +143,9 @@ class Driver(object):
             
         return total_R, environment
             
-    def Q_to_plot(self, m, axes, pick_max=False):
-        M = m
-        Q = self.Q[0:M, :, :, :, :, :]
+    def Q_to_plot(self, axes, pick_max=False):
+        Q = self.Q
+        M = Q.shape[0]
         if pick_max:
             Q = np.max(Q, axis=axes)
         else:
@@ -147,24 +154,23 @@ class Driver(object):
         #self.logger.debug("%s", Q.astype(np.int32))
         return Q
 
-    def C_to_plot(self, m, axes):
-        M = m
-        C = self.C[0:M, :, :, :, :, :]
+    def C_to_plot(self, axes):
+        C = self.C
+        M = C.shape[0]
         C = np.sum( C, axis=axes)
         C = C.reshape(M, -1).T
         #self.logger.debug("%s", C)
         return C
 
     def plotQ(self, m, axes, t_suffix):
-        M = m
-        Q = self.Q_to_plot(m, axes)
+        Q = self.Q_to_plot(axes)
         util.heatmap(Q, None, "Q total per juncture %s" % t_suffix, pref="Q")
         
-        C = self.C_to_plot(m, axes)    
+        C = self.C_to_plot(axes)    
         util.heatmap(C, None, "Total updates per juncture %s" % t_suffix, pref="C")
 
     def dumpQ(self, pref=""):
-        M = Driver.NUM_JUNCTURES
+        M = self.num_junctures
         util.dump(self.Q.reshape(M, -1), "Q_%s_%s" % (M, pref))
         #util.dump(self.C.reshape(M, -1), "C_%s" % M)
         #util.dump(self.N.reshape(M, -1), "N_%s" % M)

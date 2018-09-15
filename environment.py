@@ -21,8 +21,6 @@ class Environment(object):
     for the Driver.
     '''
     
-    NUM_MILESTONES = 36#27   # Points at which rewards will be given
-
     def __init__(self, track, car, num_junctures, should_record=False):
         '''
         Constructor
@@ -30,17 +28,21 @@ class Environment(object):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
 
-        self.num_junctures = num_junctures
-        self.num_milestones = Environment.NUM_MILESTONES
-        
         self.track = track
         self.car = car
-        self.car.restart(track, should_record)
+
+        # Junctures are where actions can be taken
+        self.num_junctures = num_junctures
+        # Milestones are where rewards may be given
+        self.num_milestones = track.num_milestones
+        
         self.curr_juncture = 0
         self.curr_milestone = 0
         self.curr_time = 0
 
-        self.track_anchor = None
+        self.car.restart(track, should_record)
+
+        self.track_anchor = self.track.anchor(self.car.location)
         self.reached_finish = False
         self.last_progress = 0
         #self.logger.debug("%s", self.state_encoding())
@@ -68,7 +70,7 @@ class Environment(object):
             self.track_anchor = self.track.anchor(self.car.location)
             if not self.track.is_inside(self.track_anchor):
                 # Car has crashed!
-                self.logger.debug("Car crashed")
+                #self.logger.debug("Car crashed")
                 # Think of this R as a penalty for untravelled track (plus 5000)
                 R += 5000 * self.last_progress
         
@@ -79,7 +81,7 @@ class Environment(object):
                                                next_milestone):
                 # milestone reached
                 self.curr_milestone += 1
-                self.logger.debug("milestone %d reached", self.curr_milestone)
+                #self.logger.debug("milestone %d reached", self.curr_milestone)
                 next_milestone = (self.curr_milestone + 1) % self.num_milestones
                 R += 10
                 #TODO: maybe there are multiple milestones to "jump"
@@ -88,7 +90,7 @@ class Environment(object):
                                               next_juncture):
                 # Car location has moved beyond juncture
                 # TODO: what if it has actually moved backwards?
-                self.logger.debug("juncture %d reached", next_juncture)
+                #self.logger.debug("juncture %d reached", next_juncture)
                 break
         
 
@@ -100,7 +102,7 @@ class Environment(object):
             # Reached finish line?
             if self.curr_juncture == self.num_junctures:
                 self.reached_finish = True
-                self.logger.debug("Reachd finish line")
+                #self.logger.debug("Reached finish line")
                 R += 5000 * 1 # 100 percent
                 return (R, None)
 
@@ -111,7 +113,7 @@ class Environment(object):
                 break
                 
             # Skip through bypassed junctures
-            self.logger.debug("jumping juncture section")
+            self.logger.debug("jumping juncture section %d", self.curr_juncture)
             
         return (R, self.state_encoding())
     
@@ -136,11 +138,11 @@ class Environment(object):
         for i, act in enumerate(self.car.action_history):
             steer, accel = act
             dirn, sp = self.car.vector_history[i]
-            self.logger.debug("  Steered %d with Accel %d, dirn %d, speed %d", 
+            self.logger.info("  Steered %d with Accel %d, dirn %d, speed %d", 
                               steer-1, accel-1, dirn, sp)
-        self.logger.debug("  SteersA: %s", [a[0] for a in self.car.action_history])
-        self.logger.debug("  AccelsA: %s", [a[1] for a in self.car.action_history])
-        self.logger.debug("  Total time taken: %d", self.curr_time)
+        self.logger.info("  SteersA: %s", [a[0] for a in self.car.action_history])
+        self.logger.info("  AccelsA: %s", [a[1] for a in self.car.action_history])
+        self.logger.info("  Total time taken: %d", self.curr_time)
 
     def play_movie(self, save=True, show=True, pref=""):
         if not self.should_record:

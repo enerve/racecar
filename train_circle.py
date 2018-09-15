@@ -6,7 +6,6 @@ Created on Sep 14, 2018
 
 import logging
 
-from environment import Environment
 from car import Car
 from track import CircleTrack
 from driver import Driver
@@ -29,15 +28,31 @@ def main():
     
     # --------------
     
+    NUM_JUNCTURES = 28
+    NUM_MILESTONES = 27
+    NUM_LANES = 5
+    MAX_SPEED = NUM_SPEEDS = 3
+    NUM_DIRECTIONS = 20
+    
+    NUM_STEER_POSITIONS = 3
+    NUM_ACCEL_POSITIONS = 3
+
     RADIUS = 98
-    track = CircleTrack((0, 0), RADIUS, 20, Driver.NUM_JUNCTURES,
-                        Environment.NUM_MILESTONES, Driver.NUM_LANES)
-    NUM_SPEEDS = 3
-    car = Car(Driver.NUM_DIRECTIONS, NUM_SPEEDS)
+    track = CircleTrack((0, 0), RADIUS, 20, NUM_JUNCTURES,
+                        NUM_MILESTONES, NUM_LANES)
+    car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
      
      
     #original_driver = Driver(alpha=1, gamma=1, explorate=2500)
-    driver = Driver(alpha=1, gamma=1, explorate=2500)
+    driver = Driver(1, # alpha
+                    1, # gamma
+                    2500, # explorate
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS)
     #driver = Driver(alpha=0.2, gamma=1, load_filename="RC_qlearn_652042_Q_28_.csv")
     trainer.train(driver, track, car, 200*1000)
     trainer.play_best(driver, track, car)
