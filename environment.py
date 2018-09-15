@@ -21,7 +21,7 @@ class Environment(object):
     for the Driver.
     '''
     
-    NUM_MILESTONES = 27   # Points at which rewards will be given
+    NUM_MILESTONES = 36#27   # Points at which rewards will be given
 
     def __init__(self, track, car, num_junctures, should_record=False):
         '''
@@ -39,7 +39,10 @@ class Environment(object):
         self.curr_juncture = 0
         self.curr_milestone = 0
         self.curr_time = 0
+
+        self.track_anchor = None
         self.reached_finish = False
+        self.last_progress = 0
         #self.logger.debug("%s", self.state_encoding())
         
         self.should_record = should_record
@@ -60,24 +63,32 @@ class Environment(object):
             #self.logger.debug("  moving further inside")
             self.car.move()
             self.curr_time += 1
+            #self.logger.debug("Location: %s", (self.car.location, ))
             R += -1
-            if not self.track.within_milestone(self.car.location, 
+            self.track_anchor = self.track.anchor(self.car.location)
+            if not self.track.is_inside(self.track_anchor):
+                # Car has crashed!
+                self.logger.debug("Car crashed")
+                # Think of this R as a penalty for untravelled track (plus 5000)
+                R += 5000 * self.last_progress
+        
+                return (R, None)
+            self.last_progress = self.track.progress_made(self.track_anchor)
+            if not self.track.within_milestone(self.track_anchor, 
                                                self.curr_milestone,
                                                next_milestone):
                 # milestone reached
                 self.curr_milestone += 1
+                self.logger.debug("milestone %d reached", self.curr_milestone)
                 next_milestone = (self.curr_milestone + 1) % self.num_milestones
                 R += 10
-            if not self.track.is_inside(self.car.location):
-                # Car has crashed!
-                # Think of this R as a penalty for untravelled track (plus 5000)
-                R += 5000 * self.track.progress_made(self.car.location)
-        
-                return (R, None)
-            if not self.track.within_juncture(self.car.location, 
+                #TODO: maybe there are multiple milestones to "jump"
+            if not self.track.within_juncture(self.track_anchor, 
                                               self.curr_juncture,
                                               next_juncture):
                 # Car location has moved beyond juncture
+                # TODO: what if it has actually moved backwards?
+                self.logger.debug("juncture %d reached", next_juncture)
                 break
         
 
@@ -89,17 +100,18 @@ class Environment(object):
             # Reached finish line?
             if self.curr_juncture == self.num_junctures:
                 self.reached_finish = True
+                self.logger.debug("Reachd finish line")
                 R += 5000 * 1 # 100 percent
                 return (R, None)
 
             # if curr juncture now covers location, stop advancing juncture
-            if self.track.within_juncture(self.car.location,
+            if self.track.within_juncture(self.track_anchor,
                                           self.curr_juncture,
                                           next_juncture):
                 break
                 
             # Skip through bypassed junctures
-            self.logger.debug("jumping section")
+            self.logger.debug("jumping juncture section")
             
         return (R, self.state_encoding())
     
@@ -113,7 +125,7 @@ class Environment(object):
         if self.car is None:
             return None
         j = self.curr_juncture
-        l = self.track.lane_encoding(self.car.location)
+        l = self.track.lane_encoding(self.track_anchor)
         v, d = self.car.state_encoding()
         return j, l, v, d
 
@@ -141,9 +153,9 @@ class Environment(object):
         for pos in self.car.location_history:
             loc, speed, dir = pos
             A = self.track.draw()
-            self.car.draw(loc, A)
+            self.car.draw(self.track.location_to_coordinates(loc), A)
 
-            im = ax.imshow(A, cmap='Greys')#, animated=True)
+            im = ax.imshow(A, aspect='equal')
 #             ax.text(50, 50, "Testtttt", fontdict=None)
             debuginfo = "S:%d\nD:%d" % (speed, dir)
             t = ax.annotate(debuginfo, (10,20)) # add text
