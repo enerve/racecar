@@ -7,7 +7,7 @@ Created on Sep 14, 2018
 import logging
 
 from car import Car
-from driver import Driver
+from qlearn import QDriver
 from track import LineTrack
 import cmd_line
 import log
@@ -49,7 +49,7 @@ def main():
     NUM_SPEEDS = 3
     car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
     
-    driver = Driver(1, # alpha
+    driver = QDriver(1, # alpha
                     1, # gamma
                     100, # explorate
                     NUM_JUNCTURES,

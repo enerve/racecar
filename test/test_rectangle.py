@@ -9,7 +9,6 @@ import logging
 from environment import Environment
 from car import Car
 from track import LineTrack
-from driver import Driver
 import trainer
 
 import cmd_line

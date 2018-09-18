@@ -8,7 +8,7 @@ import logging
 
 from car import Car
 from track import CircleTrack
-from driver import Driver
+from qlearn import QDriver
 import cmd_line
 import log
 import util
@@ -43,8 +43,8 @@ def main():
     car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
      
      
-    #original_driver = Driver(alpha=1, gamma=1, explorate=2500)
-    driver = Driver(1, # alpha
+    #original_driver = QDriver(alpha=1, gamma=1, explorate=2500)
+    driver = QDriver(1, # alpha
                     1, # gamma
                     4, # explorate
                     NUM_JUNCTURES,
@@ -54,7 +54,7 @@ def main():
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
     #driver = Driver(alpha=0.2, gamma=1, load_filename="RC_qlearn_652042_Q_28_.csv")
-    trainer.train(driver, track, car, 50*1000)
+    trainer.train(driver, track, car, 10*1000)
     trainer.play_best(driver, track, car)
              
 
