@@ -41,7 +41,7 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
     best_R = -10000
     best_Jc = 9
     
-    NUM_RESTARTS = 1
+    NUM_RESTARTS = 0
     for ep in range(num_episodes):
         total_R, environment = driver.run_episode(track, car)
 
@@ -128,7 +128,7 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
         if ep > 0 and ep % 10000 == 0:
             logger.debug("Ep %d ", ep)
             
-        if ep > 0 and ep % (num_episodes // NUM_RESTARTS) == 0:
+        if ep > 0 and ep % (num_episodes // (NUM_RESTARTS + 1)) == 0:
             logger.debug("Restarting exploration (ep %d)", ep)
             driver.restart_exploration()
             best_R = -10000
@@ -183,12 +183,15 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
 #         labels.append("ms %d" % i)
 #     util.plot(S_rm, stat_e_100, labels, "Juncture reward", pref="rm")
 
-#     lines = []
-#     labels = []
-#     for i in range(len(stat_m)):
-#         lines.append(stat_m[i])
-#         labels.append("ms %d" % i)            
-#     util.plot(lines, stat_e_1000, labels, "Max juncture reached", pref="ms")
+    util.plot([stat_bestpath_times], [stat_e_bp], ["%d restarts" % NUM_RESTARTS],
+              "Time taken by best path", pref="bpt")
+    
+    lines = []
+    labels = []
+    for i in range(len(stat_m)):
+        lines.append(stat_m[i])
+        labels.append("ms %d" % i)            
+    util.plot(lines, stat_e_1000, labels, "Max juncture reached", pref="ms")
 
     return (stat_bestpath_times, stat_e_bp)
 
