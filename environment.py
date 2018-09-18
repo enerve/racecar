@@ -113,7 +113,7 @@ class Environment(object):
                 break
                 
             # Skip through bypassed junctures
-            self.logger.debug("jumping juncture section %d", self.curr_juncture)
+            #self.logger.debug("jumping juncture section %d", self.curr_juncture)
             
         return (R, self.state_encoding())
     
@@ -159,7 +159,7 @@ class Environment(object):
 
             im = ax.imshow(A, aspect='equal')
 #             ax.text(50, 50, "Testtttt", fontdict=None)
-            debuginfo = "S:%d\nD:%d" % (speed, dir)
+            debuginfo = ""#"S:%d\nD:%d" % (speed, dir)
             t = ax.annotate(debuginfo, (10,20)) # add text
             
             image_list.append([im, t])

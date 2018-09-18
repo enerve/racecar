@@ -172,7 +172,7 @@ class LineTrack(Track):
         Circ = (x * x + y * y)
         return Circ <= radius**2
 
-    def draw_matrix(self):
+    def draw_matrix(self, draw_lanes=False):
         W = self.W
         H = self.H
         A = np.zeros((H, W))
@@ -198,19 +198,41 @@ class LineTrack(Track):
         A2 = (A.T + A2.T).T
         A2 = A2 + (255 - 50)
 
-#         # Draw junctures/milestones
-#         for (x1, y1, x2, y2) in self.lines:
-#             
-#             lengths
-#             d = max(abs(x2 - x1), abs(y2 - y1))
-#             for j in range(d):
-#                 x = int(x1 + j * (x2 - x1) / d)
-#                 y = int(y1 + j * (y2 - y1) / d)
-#                 multipoints.append((x, y))
-
-        color = np.array([10, 10, 10])
-        for (x, y) in self.points:
-            A2[self.H - y, x] = color
+        # Draw junctures/milestones
+        if draw_lanes:
+            color = np.array([0, 150, 250])
+            j_length = self.total_length / self.num_junctures
+            progress = 0
+            l = 0
+            for j in range(self.num_junctures):
+                progress += j_length
+                
+                while l < len(self.lengths):
+                    if self.lengths[l] > progress:
+                        break
+                    progress -= self.lengths[l]
+                    l += 1
+                else:
+                    # use the end of the last line
+                    l -= 1
+                    progress = self.lengths[l]
+                    
+                x1, y1, x2, y2 = self.lines[l]
+                p1_ = np.array((x1, y1))
+                p2_ = np.array((x2, y2))
+                line = p2_ - p1_
+                proj_ = p1_ + line * progress / self.lengths[l]
+                
+                rotline = np.array((-line[1], line[0])) # line rotated clockwise
+                rotline = rotline / self.lengths[l]
+                rotline = rotline * self.width
+                for n in range(self.num_lanes):
+                    x_ = np.round(proj_ + rotline * ((n+0.5) / self.num_lanes - 0.5))
+                    #self.logger.debug(
+                    #    "j%d: x_%s   proj %s plus rotline %s... from p1 %s to p2 %s... progress %0.2f / length %0.2f",
+                    #    j, x_, proj_, rotline, p1_, p2_, progress, self.lengths[l])
+                    c_ = self.location_to_coordinates(x_)
+                    A2[c_[1], c_[0]] = color
 
         return A2
         

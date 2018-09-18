@@ -41,8 +41,9 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
     best_R = -10000
     best_Jc = 9
     
+    NUM_RESTARTS = 1
     for ep in range(num_episodes):
-        R, environment = driver.run_episode(track, car)
+        total_R, environment = driver.run_episode(track, car)
 
             
         count_m[ep % smooth] = Eye[environment.curr_juncture]
@@ -100,9 +101,9 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
             
         if ep > 0 and ep % (num_episodes // 100) == 99:
             bestpath_env = best_environment(driver, track, car)
-            if bestpath_env.has_reached_finish():
-                stat_bestpath_times.append(bestpath_env.total_time_taken())
-                stat_e_bp.append(ep)
+            #if bestpath_env.has_reached_finish():
+            stat_bestpath_times.append(bestpath_env.total_time_taken())
+            stat_e_bp.append(ep)
             
         if ep > 0 and ep % (num_episodes // 200) == 0:
             stat_e_200.append(ep)
@@ -126,6 +127,11 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
 
         if ep > 0 and ep % 10000 == 0:
             logger.debug("Ep %d ", ep)
+            
+        if ep > 0 and ep % (num_episodes // NUM_RESTARTS) == 0:
+            logger.debug("Restarting exploration (ep %d)", ep)
+            driver.restart_exploration()
+            best_R = -10000
 
     # save learned values to file
     driver.dumpQ(pref=pref)
@@ -194,7 +200,7 @@ def play_best(driver, track, car, should_play_movie=True, pref=""):
     return environment
 
 def best_environment(driver, track, car):
-    R, environment = driver.run_episode(track, car, run_best=True)
+    total_R, environment = driver.run_episode(track, car, run_best=True)
     return environment
 
 def drive_manual(environment, manual_actions):

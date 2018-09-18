@@ -68,13 +68,18 @@ class Driver(object):
                            num_directions,
                            num_steer_positions,
                            num_accel_positions), dtype=np.int32)
-        # C is the count of visits to state
-        self.N = np.zeros((num_junctures,
-                           num_lanes,
-                           num_speeds,
-                           num_directions), dtype=np.int32)
         # Rs is the average reward at juncture (for statistics)
         self.Rs = np.zeros((num_junctures), dtype=np.float)
+        self.restart_exploration()
+        self.restarted = False
+
+    def restart_exploration(self):
+        # N is the count of visits to state
+        self.N = np.zeros((self.num_junctures,
+                           self.num_lanes,
+                           self.num_speeds,
+                           self.num_directions), dtype=np.int32)
+        self.restarted = True
 
     def pick_action(self, S, run_best):  
         if run_best:
@@ -114,7 +119,6 @@ class Driver(object):
         m, l, v, d = state
         s, a = action
         return (m, l, v, d, s, a)
-    
 
     def run_episode(self, track, car, run_best=False):
         environment = Environment(track,
@@ -131,8 +135,16 @@ class Driver(object):
 
             R, S_ = environment.step(A)
 
+            # TODO: testing modified alpha
+            if self.restarted:
+                n = self.N[S]
+                N0 = self.explorate
+                factor = n / (N0 + n)
+            else:
+                factor = 1
+
             target = R + self.gamma * self.max_at_state(S_)
-            self.Q[I] += self.alpha * (target - self.Q[I])
+            self.Q[I] += self.alpha * (target - self.Q[I]) * factor
             self.C[I] += 1
             self.N[S] += 1
             if S_ is not None:

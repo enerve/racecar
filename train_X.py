@@ -13,6 +13,7 @@ import cmd_line
 import log
 import util
 import trainer
+import matplotlib.pyplot as plt
 
 def main():
     args = cmd_line.parse_args()
@@ -21,20 +22,28 @@ def main():
     util.pre_problem = 'RC'
 
     logger = logging.getLogger()
-    log.configure_logger(logger, "RaceCar FS rectangle")
+    log.configure_logger(logger, "RaceCar FS X")
     logger.setLevel(logging.DEBUG)
 
     # --------------
     
     points = [
-            (120, 40),
-            (210, 40),
-            (210, 180),
-            (30, 180),
-            (30, 40)
+            (45, 10),
+            (80, 10),
+            (120, 90),
+            (160, 10),
+            (230, 10),
+            (195, 110),
+            (230, 210),
+            (160, 210),
+            (120, 130),
+            (80, 210),
+            (10, 210),
+            (45, 110),
+            (10, 10)
         ]
-    NUM_JUNCTURES = 50
-    NUM_MILESTONES = 50
+    NUM_JUNCTURES = 200
+    NUM_MILESTONES = 100
     NUM_LANES = 5
     MAX_SPEED = NUM_SPEEDS = 3
     NUM_DIRECTIONS = 20
@@ -46,20 +55,23 @@ def main():
     track = LineTrack(points, WIDTH, NUM_JUNCTURES, NUM_MILESTONES,
                       NUM_LANES)
     
+    plt.imshow(track.draw(), aspect='equal')
+    plt.show()
+    return
+    
     NUM_SPEEDS = 3
     car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
     
     driver = Driver(1, # alpha
                     1, # gamma
-                    100, # explorate
+                    10, # explorate
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS,
-                    load_filename="RC_qlearn_10876_Q_50__.csv")
-    trainer.train(driver, track, car, 20*1000)
+                    NUM_ACCEL_POSITIONS)
+    trainer.train(driver, track, car, 100*1000)
     trainer.play_best(driver, track, car)
              
 
