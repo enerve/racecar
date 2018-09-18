@@ -49,11 +49,11 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
         count_m[ep % smooth] = Eye[environment.curr_juncture]
         
         if environment.curr_juncture >= 10:
-            if R > best_R:
+            if total_R > best_R:
                 logger.debug("Ep %d  Juncture %d reached with R=%d T=%d",
-                                  ep, environment.curr_juncture, R,
+                                  ep, environment.curr_juncture, total_R,
                                   environment.total_time_taken())
-                best_R = R
+                best_R = total_R
                 best_Jc = environment.curr_juncture
 #                     environment.report_history()
 #                     environment.play_movie()
