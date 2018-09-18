@@ -55,6 +55,8 @@ def plot(lines, x, labels, title=None, pref=None):
         l = lines[i]
         plt.plot(x, l, label=labels[i])
     plt.legend()
+    if title:
+        plt.title(title, loc='center')
     save_plot(pref)
     plt.show()
 

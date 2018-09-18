@@ -73,12 +73,13 @@ class Driver(object):
         self.restart_exploration()
         self.restarted = False
 
-    def restart_exploration(self):
+    def restart_exploration(self, scale_explorate=1):
         # N is the count of visits to state
         self.N = np.zeros((self.num_junctures,
                            self.num_lanes,
                            self.num_speeds,
                            self.num_directions), dtype=np.int32)
+        self.explorate *= scale_explorate
         self.restarted = True
 
     def pick_action(self, S, run_best):  
@@ -135,13 +136,12 @@ class Driver(object):
 
             R, S_ = environment.step(A)
 
-            # TODO: testing modified alpha
-            if self.restarted:
-                n = self.N[S]
-                N0 = self.explorate
-                factor = n / (N0 + n)
-            else:
-                factor = 1
+            # Experiment: testing modified alpha
+            factor = 1
+#             if self.restarted:
+#                 n = self.N[S]
+#                 N0 = self.explorate
+#                 factor = n / (N0 + n)
 
             target = R + self.gamma * self.max_at_state(S_)
             self.Q[I] += self.alpha * (target - self.Q[I]) * factor

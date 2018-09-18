@@ -55,23 +55,23 @@ def main():
     track = LineTrack(points, WIDTH, NUM_JUNCTURES, NUM_MILESTONES,
                       NUM_LANES)
     
-    plt.imshow(track.draw(), aspect='equal')
-    plt.show()
-    return
+#     plt.imshow(track.draw(), aspect='equal')
+#     plt.show()
+#     return
     
     NUM_SPEEDS = 3
     car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
     
     driver = Driver(1, # alpha
                     1, # gamma
-                    10, # explorate
+                    5, # explorate
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
-    trainer.train(driver, track, car, 100*1000)
+    trainer.train(driver, track, car, 20*1000)
     trainer.play_best(driver, track, car)
              
 

@@ -46,7 +46,7 @@ def main():
     #original_driver = Driver(alpha=1, gamma=1, explorate=2500)
     driver = Driver(1, # alpha
                     1, # gamma
-                    2500, # explorate
+                    4, # explorate
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
@@ -54,7 +54,7 @@ def main():
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
     #driver = Driver(alpha=0.2, gamma=1, load_filename="RC_qlearn_652042_Q_28_.csv")
-    trainer.train(driver, track, car, 200*1000)
+    trainer.train(driver, track, car, 50*1000)
     trainer.play_best(driver, track, car)
              
 
