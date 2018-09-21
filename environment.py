@@ -138,9 +138,9 @@ class Environment(object):
         if not self.should_record:
             return
 
-        for i, act in enumerate(self.car.action_history):
+        for vect, act in zip(self.car.vector_history, self.car.action_history):
             steer, accel = act
-            dirn, sp = self.car.vector_history[i]
+            dirn, sp = vect
             self.logger.info("  Steered %d with Accel %d, dirn %d, speed %d", 
                               steer-1, accel-1, dirn, sp)
         self.logger.info("  SteersA: %s", [a[0] for a in self.car.action_history])

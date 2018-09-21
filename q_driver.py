@@ -78,6 +78,7 @@ class QDriver(Driver):
                            self.num_directions), dtype=np.int32)
         # Rs is the average reward at juncture (for statistics)
         self.Rs = np.zeros((num_junctures), dtype=np.float)
+        self.avg_delta = 0
         self.restarted = False
 
         self.stat_e_100 = []
@@ -95,6 +96,8 @@ class QDriver(Driver):
 
         # track max Q per juncture, as iterations progress
         self.stat_juncture_maxQ = []
+        # track average change in Q, as iterations progress
+        self.stat_dlm = []
 
     def restart_exploration(self, scale_explorate=1):
         super().restart_exploration()
@@ -106,6 +109,7 @@ class QDriver(Driver):
                            self.num_directions), dtype=np.int32)
         self.explorate *= scale_explorate
         self.logger.debug("Restarting with explorate=%d", self.explorate)
+        self.avg_delta = 0
         self.restarted = True
 
     def pick_action(self, S, run_best):
@@ -162,11 +166,14 @@ class QDriver(Driver):
             R, S_ = environment.step(A)
 
             target = R + self.gamma * self.max_at_state(S_)
-            self.Q[I] += self.alpha * (target - self.Q[I])
+            delta = (target - self.Q[I])
+            self.Q[I] += self.alpha * delta
             self.C[I] += 1
             self.N[S] += 1
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
+            if self.C[I] > 1:
+                self.avg_delta += 0.02 * (delta - self.avg_delta)
 
             S = S_
             total_R += R
@@ -195,6 +202,7 @@ class QDriver(Driver):
             #stat_debug_n.append([an])
 
             self.stat_juncture_maxQ.append(np.max(self.Q, axis=(1,2,3,4,5)))
+            self.stat_dlm.append(self.avg_delta)
 
         if ep > 0 and ep % (num_episodes // 200) == 0:
             self.stat_e_200.append(ep)
@@ -233,12 +241,12 @@ class QDriver(Driver):
         #         util.plot(S_dn, self.stat_e_100, ["P(random action)"], 
         #                   "debug: n count", pref="dn")
      
-        S_jmax = np.array(self.stat_juncture_maxQ).T
-        self.logger.debug("stat_juncture_maxQ: \n%s", (100*S_jmax).astype(np.int32))
-        labels = []
-        for i in range(len(S_jmax)):
-            labels.append("Jn %d" % i)
-        util.plot(S_jmax, self.stat_e_100, labels, "Juncture max Q", pref="jmax")
+#         S_jmax = np.array(self.stat_juncture_maxQ).T
+#         self.logger.debug("stat_juncture_maxQ: \n%s", (100*S_jmax).astype(np.int32))
+#         labels = []
+#         for i in range(len(S_jmax)):
+#             labels.append("Jn %d" % i)
+#         util.plot(S_jmax, self.stat_e_100, labels, "Juncture max Q", pref="jmax")
         
         #self.plotQ(28, (1, 4, 5), "speed, direction")
         #self.plotQ(28, (1, 2, 3), "steering, accel") 
@@ -256,8 +264,7 @@ class QDriver(Driver):
 #         util.heatmap(S_dq, (0, EPISODES, driver.num_junctures, 0),
 #                      "Diff Q per juncture over epochs", pref="DQ")
 
-        self.logger.debug("Fraction of changes to next-state: %0.2f",
-                          np.sum(self.D) / np.sum(self.C))
+        util.plot([self.stat_dlm], self.stat_e_100, ["Avg ΔQ"], pref="delta")
 
     def plottable(self, X, axes, pick_max=False):
         M = X.shape[0]

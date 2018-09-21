@@ -87,8 +87,8 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
 
         if ep > 0 and ep % (num_episodes // 1000) == 0:
             stat_e_1000.append(ep)
-            for i, c in enumerate(count_m.sum(axis=0)):
-                stat_m[i].append(c)
+            for sm, c in zip(stat_m, count_m.sum(axis=0)):
+                sm.append(c)
 #                     stat_ep[i].append(ep)
             #count_m = np.zeros((driver.num_junctures + 1), dtype=np.int32)
 
