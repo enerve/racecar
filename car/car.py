@@ -74,8 +74,8 @@ class Car():
         #self.logger.debug("direction=%d .. d=%d", self.direction, d)
         return v, d
 
-    def draw(self, coordinates, A):
+    def draw(self, coordinates, A, color_rgb=[200, 0, 0]):
         x, y = coordinates
-        color = np.array([200, 0, 0])
+        color = np.array(color_rgb)
         #self.logger.debug("%s %s", i, j)
         A[y, x] = color

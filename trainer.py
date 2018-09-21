@@ -7,7 +7,7 @@ Created on Sep 14, 2018
 import logging
 import numpy as np
 import random
-
+import time
 import util
 
 def train(driver, track, car, num_episodes, seed=10, pref=''):
@@ -30,12 +30,14 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
     stat_e_1000 = []
         
     logger.debug("Starting")
+    start_time = time.clock()
+    
     best_R = -10000
     best_ep = -1
     best_finished = False
     recent_total_R = 0
     
-    NUM_RESTARTS = 6
+    num_restarts = 0
     for ep in range(num_episodes):
         total_R, environment = driver.run_episode(track, car)
 
@@ -69,12 +71,16 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
 #                                        ep, environment.curr_juncture, R)
 #                     environment.report_history()
 #                     environment.play_movie()
-            elif ep - best_ep > 3000:                
-                logger.debug("Restarting exploration (ep %d)", ep)
-                driver.restart_exploration(scale_explorate=1.5)
-                best_R = -10000
-                best_ep = -1
-                best_finished = False
+#            elif ep - best_ep > 3000:                
+#                logger.debug("Restarting exploration (ep %d)", ep)
+#                driver.restart_exploration(scale_explorate=1.5)
+#                 num_restarts += 1
+#                 
+#                 if ep > num_episodes:
+#                     break
+#                best_R = -10000
+#                best_ep = -1
+#                best_finished = False
                 
         driver.collect_stats(ep, num_episodes)
                 
@@ -102,23 +108,15 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
         if ep > 0 and ep % 10000 == 0:
             logger.debug("Ep %d ", ep)
             
+
+    logger.debug("Completed training in %d seconds", time.clock() - start_time)
+
     # save learned values to file
     driver.saveToFile(pref=pref)
     # report driver learning statistics
     driver.report_stats(pref=pref)
     
     
-#     S_qm = np.array(stat_qm).T
-#     logger.debug("stat_qm: \n%s", S_qm.astype(np.int32))
-#     util.heatmap(S_qm, (0, EPISODES, driver.num_junctures, 0),
-#                  "Total Q per juncture over epochs", pref="QM")
-#        
-#     #S_dq = S_qm[1:, :] - S_qm[:-1, :] # Q diff juncture to next juncture
-#     S_dq = S_qm[:, 1:] - S_qm[:, :-1] # Q diff epoch to next epoch
-#     logger.debug("stat_dq: \n%s", S_dq.shape)
-#     logger.debug("stat_dq: \n%s", S_dq.astype(np.int32))
-#     util.heatmap(S_dq, (0, EPISODES, driver.num_junctures, 0),
-#                  "Diff Q per juncture over epochs", pref="DQ")
 #  
 #     S_cm = np.array(stat_cm).T
 #     logger.debug("stat_cm: \n%s", S_cm.astype(np.int32))
@@ -157,6 +155,13 @@ def play_best(driver, track, car, should_play_movie=True, pref=""):
     environment = best_environment(driver, track, car)
     environment.report_history()
     environment.play_movie(show=should_play_movie, pref="bestmovie_%s" % pref)
+    return environment
+
+def show_best(driver, track, car, show=True, pref=""):
+    #logger.debug("Playing best path")
+    environment = best_environment(driver, track, car)
+    environment.report_history()
+    environment.show_path(show=show, pref="bestpath_%s" % pref)
     return environment
 
 def best_environment(driver, track, car):

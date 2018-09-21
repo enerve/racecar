@@ -8,7 +8,7 @@ import logging
 
 from car import Car
 from track import CircleTrack
-from qlearn import QDriver
+from q_driver import QDriver
 import cmd_line
 import log
 import util
@@ -19,7 +19,7 @@ def main():
     args = cmd_line.parse_args()
 
     util.prefix_init(args)
-    util.pre_problem = 'RC'
+    util.pre_problem = 'RC circle'
 
 #     logger = logging.getLogger(__name__)
     logger = logging.getLogger()
@@ -46,7 +46,7 @@ def main():
     #original_driver = QDriver(alpha=1, gamma=1, explorate=2500)
     driver = QDriver(1, # alpha
                     1, # gamma
-                    4, # explorate
+                    20, # explorate
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
@@ -54,7 +54,7 @@ def main():
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
     #driver = Driver(alpha=0.2, gamma=1, load_filename="RC_qlearn_652042_Q_28_.csv")
-    trainer.train(driver, track, car, 10*1000)
+    trainer.train(driver, track, car, 400*1000)
     trainer.play_best(driver, track, car)
              
 

@@ -7,7 +7,7 @@ Created on Sep 14, 2018
 import logging
 
 from car import Car
-from qlearn import QDriver
+from q_driver import QDriver
 from track import LineTrack
 import cmd_line
 import log
@@ -19,7 +19,7 @@ def main():
     args = cmd_line.parse_args()
 
     util.prefix_init(args)
-    util.pre_problem = 'RC'
+    util.pre_problem = 'RC X'
 
     logger = logging.getLogger()
     log.configure_logger(logger, "RaceCar FS X")
@@ -62,6 +62,8 @@ def main():
     NUM_SPEEDS = 3
     car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
     
+    filename = None
+    
     driver = QDriver(1, # alpha
                     1, # gamma
                     10, # explorate
@@ -70,8 +72,9 @@ def main():
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS)
-    trainer.train(driver, track, car, 2*1000)
+                    NUM_ACCEL_POSITIONS,#)
+                    load_filename=filename)
+    trainer.train(driver, track, car, 10*1000)
     trainer.play_best(driver, track, car)
              
 

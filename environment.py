@@ -117,6 +117,9 @@ class Environment(object):
             
         return (R, self.state_encoding())
     
+    def get_location(self):
+        return self.car.location
+    
     def has_reached_finish(self):
         return self.reached_finish
     
@@ -176,4 +179,29 @@ class Environment(object):
     
             logging.getLogger("matplotlib.animation").setLevel(logging.INFO)
             ani.save(util.prefix() + pref + '.mp4', writer=writer)
+        plt.close()
+    
+    def show_path(self, save=True, show=True, env2=None, pref=""):
+        if not self.should_record:
+            return
+
+        ax = plt.gca()
+        plt.axis('off')
+        A = self.track.draw()
+        for pos in self.car.location_history:
+            loc, speed, dir = pos
+            self.car.draw(self.track.location_to_coordinates(loc), A)
+
+        if env2:
+            for pos in env2.car.location_history:
+                loc, speed, dir = pos
+                env2.car.draw(env2.track.location_to_coordinates(loc), A,
+                              [0, 0, 200])
+
+        ax.imshow(A, aspect='equal')
+
+        if save:
+            util.save_plot(pref)
+        if show:
+            plt.show()
         plt.close()

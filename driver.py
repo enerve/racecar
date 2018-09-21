@@ -49,21 +49,6 @@ class Driver(object):
         # Rs is the average reward at juncture (for statistics)
         self.Rs = np.zeros((num_junctures), dtype=np.float)
 
-        self.stat_e_100 = []
-        self.stat_qm = []
-        self.stat_cm = []
-        self.stat_rm = []
-        
-        self.stat_debug_qv = []
-        self.stat_debug_n = []
-
-        self.stat_e_200 = []
-        self.q_plotter = util.Plotter("Q value at junctures along lanes")
-        self.qx_plotter = util.Plotter("Max Q value at junctures along lanes")
-        self.c_plotter = util.Plotter("C value at junctures along lanes")
-
-        # track max Q per juncture, as iterations progress
-        self.stat_juncture_maxQ = []
 
     def restart_exploration(self):
         pass
