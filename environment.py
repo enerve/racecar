@@ -67,7 +67,7 @@ class Environment(object):
             self.curr_time += 1
             #self.logger.debug("Location: %s", (self.car.location, ))
             R += -1
-            self.track_anchor = self.track.anchor(self.car.location)
+            self.track_anchor = self.track.anchor(self.car.location, self.track_anchor)
             if not self.track.is_inside(self.track_anchor):
                 # Car has crashed!
                 #self.logger.debug("Car crashed")

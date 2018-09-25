@@ -4,22 +4,19 @@ Created on Sep 14, 2018
 @author: enerve
 '''
 
+from functools import lru_cache
 import logging
-import matplotlib.pyplot as plt
 import math
 import numpy as np
 
 from track import Track
-
-def dot(v1, v2):
-    return v1[0] * v2[0] + v1[1] * v2[1]
 
 class LineTrack(Track):
     '''
     A track defined by a loop of connected lines.
     '''
 
-    def __init__(self, points, width, num_junctures, num_milestones,
+    def __init__(self, points, track_width, num_junctures, num_milestones,
                  num_lanes):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -28,39 +25,40 @@ class LineTrack(Track):
         #     loop representing the center of the track.
         self.points = points
         
-        self.W = 240
-        self.H = 220
-        self.width = width
+        self.W, self.H = 240, 220
+        self.track_width = track_width
         self.num_junctures = num_junctures
         self.num_milestones = num_milestones
         self.num_lanes = num_lanes
 
-        self.track_matrix = None
-
         self.lines = []
         self.lengths = []
+        self.cummu_lengths = []
         self.total_length = 0
         for i in range(len(self.points)):
             p1 = self.points[i]
             p2 = self.points[(i+1) % len(self.points)]
-            x1, y1 = p1
-            x2, y2 = p2
-            self.lines.append((x1, y1, x2, y2))
+            np1, np2 = np.array(p1), np.array(p2)
+            self.lines.append((np1, np2))
             
-            length = math.sqrt((x1-x2)**2 + (y1-y2)**2)
+            length = np.sum((np1 - np2) ** 2)
             self.lengths.append(length)
+            self.cummu_lengths.append(self.total_length)
             self.total_length += length
 
     def get_starting_position(self):
         return (self.points[0], 0) # going right
         
     def leftness_ratio(self, c, line, dist):
-        radius = self.width / 2
+        ''' Returns how near the given location is to the left edge of the
+            track. Returns (0..1)
+        '''
+        radius = self.track_width / 2
         rotline = (-line[1], line[0]) # line rotated clockwise
         leftness = -dist if np.inner(c, rotline) < 0 else dist
-        return (leftness + radius) / self.width
+        return (leftness + radius) / self.track_width
 
-    def anchor(self, loc):
+    def anchor(self, loc, prev_anchor=None):
         ''' Extracts information about the given location and returns a tuple:
                 fraction of track covered by this location,
                 fraction of distance from "inner edge" of road,
@@ -68,16 +66,18 @@ class LineTrack(Track):
                 else, the id of the point/corner nearest to this location
         '''
         c_ = np.array(loc)
-        radius = self.width / 2
+        radius = self.track_width / 2
         anchor = None
         
-        # Check if distance from one of the lines is within radius
-        cummu_len = 0
+        # Loop over each line and find the best anchor point for loc
+        if prev_anchor:
+            min_i = prev_anchor['line_id']
+            min_i = prev_anchor['point_id'] if min_i is None else 0
+        else:
+            min_i = 0
         nearest_line = None
         nearest_sqdist = 0
-        for i, (x1, y1, x2, y2) in enumerate(self.lines):
-            p1_ = np.array((x1, y1))
-            p2_ = np.array((x2, y2))
+        for i, (p1_, p2_) in enumerate(self.lines[min_i:], start=min_i):
             line = p2_ - p1_
             c = c_ - p1_
             
@@ -91,31 +91,32 @@ class LineTrack(Track):
                         nearest_sqdist = sqdist 
                         nearest_line = i
                         nearest_progress = \
-                            (cummu_len + fraction_of_line * self.lengths[i]) / \
-                            self.total_length
+                            (self.cummu_lengths[i] + \
+                             fraction_of_line * self.lengths[i]) / \
+                             self.total_length
                         dist = math.sqrt(sqdist)
                         anchor = {'progress': nearest_progress,
                                   'leftness': self.leftness_ratio(c, line, dist),
                                   'line_id': i,
                                   'point_id': None}
             if nearest_line is not None and nearest_line < i:
-                # we're not gonna find anything better
+                # we're not going to find anything better
                 break;
 
             if nearest_line is None:
-                # check if location is near corner p1_
-                dist = np.inner(c, c)
+                # check if location is near corner p2_
+                c2 = c_ - p2_
+                dist = np.inner(c2, c2)
                 if dist <= radius:
                     # TODO: progres within curve?
-                    anchor = {'progress': cummu_len / self.total_length,
-                              'leftness': self.leftness_ratio(c, line, dist),
+                    anchor = {'progress': self.cummu_lengths[i] / self.total_length,
+                              'leftness': self.leftness_ratio(c2, line, dist),
                               'line_id': None,
                               'point_id': i}
-                    # TODO: Note that we're assuming finish line is along a
+                    # TODO: Note that we're assuming Finish line is along a
                     #        STRAIGHT road, not in a curve
                     break
 
-            cummu_len += self.lengths[i]
 
         # If anchor is still None, the car is out of bounds / has crashed
 
@@ -165,32 +166,28 @@ class LineTrack(Track):
         return (x_, -y_)
     
     def circle_splotch(self, x, y, radius):
-        W = self.W
-        H = self.H
+        W, H = self.W, self.H
         x = np.linspace(-x, W-x, W)
         y = np.linspace(-y, H-y, H).reshape(-1, 1)
-        Circ = (x * x + y * y)
-        return Circ <= radius**2
+        return x**2 + y**2 <= radius**2
 
+    @lru_cache(maxsize=None)
     def draw_matrix(self, draw_lanes=False):
-        W = self.W
-        H = self.H
+        W, H = self.W, self.H
         A = np.zeros((H, W))
         
         multipoints = []
-        for (x1, y1, x2, y2) in self.lines:
-            y1 = self.H - y1
-            y2 = self.H - y2
+        for (p1_, p2_) in self.lines:
+            x1, x2 = p1_[0], p2_[0]
+            y1, y2 = self.H - p1_[1], self.H - p2_[1]
             d = max(abs(x2 - x1), abs(y2 - y1))
             for j in range(d):
                 x = int(x1 + j * (x2 - x1) / d)
                 y = int(y1 + j * (y2 - y1) / d)
                 multipoints.append((x, y))
         
-        radius = self.width / 2
-        for p in multipoints:
-            x, y = p
-            C = self.circle_splotch(x, y, radius)
+        for x, y in multipoints:
+            C = self.circle_splotch(x, y, radius = self.track_width / 2)
             A = np.logical_or(A, C)
 
         A = A * 50
@@ -198,7 +195,6 @@ class LineTrack(Track):
         A2 = (A.T + A2.T).T
         A2 = A2 + (255 - 50)
 
-        # Draw junctures/milestones
         if draw_lanes:
             color = np.array([0, 150, 250])
             j_length = self.total_length / self.num_junctures
@@ -225,7 +221,7 @@ class LineTrack(Track):
                 
                 rotline = np.array((-line[1], line[0])) # line rotated clockwise
                 rotline = rotline / self.lengths[l]
-                rotline = rotline * self.width
+                rotline = rotline * self.track_width
                 for n in range(self.num_lanes):
                     x_ = np.round(proj_ + rotline * ((n+0.5) / self.num_lanes - 0.5))
                     #self.logger.debug(
@@ -237,9 +233,4 @@ class LineTrack(Track):
         return A2
         
     def draw(self):
-        if self.track_matrix is None:
-            self.track_matrix = self.draw_matrix()
-            
-        A = self.track_matrix.copy()
-            
-        return A
+        return self.draw_matrix().copy()

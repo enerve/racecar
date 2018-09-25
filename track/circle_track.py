@@ -17,10 +17,8 @@ class CircleTrack(Track):
                  num_lanes):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
-        self.logger.debug("Init CircleTrack")
 
-        self.H = 220
-        self.W = 240
+        self.H, self.W = 220, 240
         self.center = center
         self.radius = radius
         self.width = width

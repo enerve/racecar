@@ -44,6 +44,7 @@ def main():
      
      
     #original_driver = QDriver(alpha=1, gamma=1, explorate=2500)
+    Q_filename = "RC_qlearn_341830_Q_50__.csv"
     driver = QDriver(1, # alpha
                     1, # gamma
                     20, # explorate
@@ -52,10 +53,12 @@ def main():
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS)
+                    NUM_ACCEL_POSITIONS,
+                    load_Q_filename=Q_filename)
     #driver = Driver(alpha=0.2, gamma=1, load_filename="RC_qlearn_652042_Q_28_.csv")
-    trainer.train(driver, track, car, 400*1000)
-    trainer.play_best(driver, track, car)
+    #trainer.train(driver, track, car, 400*1000)
+    #trainer.play_best(driver, track, car)
+    driver.report_stats("static")
              
 
     # --------- CV ---------

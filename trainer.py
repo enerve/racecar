@@ -26,7 +26,7 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
     stat_recent_total_R = []
     stat_e_bp = []
     
-    stat_m = [[] for _ in range(driver.num_junctures + 1)]
+    stat_m = []#[] for _ in range(driver.num_junctures + 1)]
     stat_e_1000 = []
         
     logger.debug("Starting")
@@ -53,43 +53,44 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
                 #best_juncture = environment.curr_juncture
                 best_ep = ep
                 best_finished = environment.has_reached_finish()
-#                     environment.report_history()
-#                     environment.play_movie()
+    #                     environment.report_history()
+    #                     environment.play_movie()
 
-#             if environment.curr_juncture >= 10:
-#                 ah = environment.car.action_history
-#                 pattern = [2]
-#                 still_matching = True
-#                 for i, p in enumerate(pattern):
-#                     #a = ah[i][0]  # steer
-#                     a = ah[i][1]  # accel
-#                     if p != a:
-#                         still_matching = False
-#                         break;
-#                 if still_matching:
-#                     logger.debug("Ep %d  juncture %d reached with R=%d",
-#                                        ep, environment.curr_juncture, R)
-#                     environment.report_history()
-#                     environment.play_movie()
-#            elif ep - best_ep > 3000:                
-#                logger.debug("Restarting exploration (ep %d)", ep)
-#                driver.restart_exploration(scale_explorate=1.5)
-#                 num_restarts += 1
-#                 
-#                 if ep > num_episodes:
-#                     break
-#                best_R = -10000
-#                best_ep = -1
-#                best_finished = False
+    #             if environment.curr_juncture >= 10:
+    #                 ah = environment.car.action_history
+    #                 pattern = [2]
+    #                 still_matching = True
+    #                 for i, p in enumerate(pattern):
+    #                     #a = ah[i][0]  # steer
+    #                     a = ah[i][1]  # accel
+    #                     if p != a:
+    #                         still_matching = False
+    #                         break;
+    #                 if still_matching:
+    #                     logger.debug("Ep %d  juncture %d reached with R=%d",
+    #                                        ep, environment.curr_juncture, R)
+    #                     environment.report_history()
+    #                     environment.play_movie()
+    #            elif ep - best_ep > 3000:                
+    #                logger.debug("Restarting exploration (ep %d)", ep)
+    #                driver.restart_exploration(scale_explorate=1.5)
+    #                 num_restarts += 1
+    #                 
+    #                 if ep > num_episodes:
+    #                     break
+    #                best_R = -10000
+    #                best_ep = -1
+    #                best_finished = False
                 
         driver.collect_stats(ep, num_episodes)
                 
 
         if ep > 0 and ep % (num_episodes // 1000) == 0:
             stat_e_1000.append(ep)
-            for sm, c in zip(stat_m, count_m.sum(axis=0)):
-                sm.append(c)
-#                     stat_ep[i].append(ep)
+            stat_m.append(count_m.sum(axis=0))
+            #for sm, c in zip(stat_m, count_m.sum(axis=0)):
+            #    sm.append(c)
+                #stat_ep[i].append(ep)
             #count_m = np.zeros((driver.num_junctures + 1), dtype=np.int32)
 
             
@@ -97,10 +98,9 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
         recent_total_R += (total_R - recent_total_R) * 10 / len_bp_split
         if ep > 0 and ep % len_bp_split == len_bp_split - 1:
             bestpath_env = best_environment(driver, track, car)
-            if bestpath_env.has_reached_finish():
-                stat_bestpath_times.append(bestpath_env.total_time_taken())
-            else:
-                stat_bestpath_times.append(500)
+            stat_bestpath_times.append(bestpath_env.total_time_taken() 
+                                       if bestpath_env.has_reached_finish() 
+                                       else 500)
             stat_e_bp.append(ep)
             stat_recent_total_R.append(recent_total_R)
             
@@ -117,23 +117,23 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
     driver.report_stats(pref=pref)
     
     
-#  
-#     S_cm = np.array(stat_cm).T
-#     logger.debug("stat_cm: \n%s", S_cm.astype(np.int32))
-#     util.heatmap(S_cm, (0, EPISODES, driver.num_junctures, 0),
-#                  "Exploration per juncture over epochs", pref="CM")
-# 
-#     S_rm = np.array(stat_rm).T
-#     logger.debug("stat_rm: \n%s", (100*S_rm).astype(np.int32))
-#     util.heatmap(S_rm, (0, EPISODES, driver.num_junctures, 0),
-#                  "Avg reward at juncture over epochs", cmap='winter',
-#                  pref="RM")
- 
-#     S_rm = S_rm[0:10]
-#     labels = []
-#     for i in range(len(S_rm)):
-#         labels.append("ms %d" % i)
-#     util.plot(S_rm, stat_e_100, labels, "Juncture reward", pref="rm")
+    #  
+    #     S_cm = np.array(stat_cm).T
+    #     logger.debug("stat_cm: \n%s", S_cm.astype(np.int32))
+    #     util.heatmap(S_cm, (0, EPISODES, driver.num_junctures, 0),
+    #                  "Exploration per juncture over epochs", pref="CM")
+    # 
+    #     S_rm = np.array(stat_rm).T
+    #     logger.debug("stat_rm: \n%s", (100*S_rm).astype(np.int32))
+    #     util.heatmap(S_rm, (0, EPISODES, driver.num_junctures, 0),
+    #                  "Avg reward at juncture over epochs", cmap='winter',
+    #                  pref="RM")
+     
+    #     S_rm = S_rm[0:10]
+    #     labels = []
+    #     for i in range(len(S_rm)):
+    #         labels.append("ms %d" % i)
+    #     util.plot(S_rm, stat_e_100, labels, "Juncture reward", pref="rm")
 
     util.plot([[10*x for x in stat_bestpath_times], stat_recent_total_R], stat_e_bp,
               ["Finish time by best-action path", "Recent avg total reward"],
@@ -141,12 +141,11 @@ def train(driver, track, car, num_episodes, seed=10, pref=''):
               pref="bpt")
     
     # Max juncture reached
-    lines = []
-    labels = []
-    for i in range(len(stat_m)):
-        lines.append(stat_m[i])
-        labels.append("ms %d" % i)            
-    util.plot(lines, stat_e_1000, labels, "Max juncture reached", pref="ms")
+#     for i in range(len(stat_m)):
+#         lines.append(stat_m[i])
+    S_m = np.array(stat_m).T
+    labels = ["ms %d" % i for i in range(len(S_m))]
+    util.plot(S_m, stat_e_1000, labels, "Max juncture reached", pref="ms")
 
     return (stat_bestpath_times, stat_e_bp)
 
