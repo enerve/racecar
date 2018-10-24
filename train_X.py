@@ -9,10 +9,10 @@ import logging
 from car import Car
 from q_driver import QDriver
 from track import LineTrack
+from trainer import Trainer
 import cmd_line
 import log
 import util
-import trainer
 import matplotlib.pyplot as plt
 
 def main():
@@ -62,7 +62,14 @@ def main():
     NUM_SPEEDS = 3
     car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
     
-    filename = None
+    logger.debug("*Problem:\t%s", util.pre_problem)
+    logger.debug("   NUM_JUNCTURES:\t%s", NUM_JUNCTURES)
+    logger.debug("   NUM_MILESTONES:\t%s", NUM_MILESTONES)
+    logger.debug("   NUM_LANES:\t%s", NUM_LANES)
+    logger.debug("   MAX_SPEED:\t%s", MAX_SPEED)
+    logger.debug("   NUM_DIRECTIONS:\t%s", NUM_DIRECTIONS)
+    logger.debug("   NUM_STEER_POSITIONS:\t%s", NUM_STEER_POSITIONS)
+    logger.debug("   NUM_ACCEL_POSITIONS:\t%s", NUM_ACCEL_POSITIONS)
     
     driver = QDriver(1, # alpha
                     1, # gamma
@@ -72,10 +79,16 @@ def main():
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS,#)
-                    load_filename=filename)
-    trainer.train(driver, track, car, 10*1000)
-    trainer.play_best(driver, track, car)
+                    NUM_ACCEL_POSITIONS)
+    trainer = Trainer(driver, track, car)
+    #subdir = "RC rect_qlearn_100_1.0_1.0_363312_"
+    subdir = None
+    if subdir:
+        driver.load_model(subdir)
+        trainer.load_stats(subdir)
+    trainer.train(10*1000)
+    trainer.report_stats()
+    trainer.play_best()
              
 
     # --------- CV ---------

@@ -57,47 +57,22 @@ class Driver(object):
         pass
     
     def run_episode(self, track, car, run_best=False):
-        #         environment = Environment(track,
-        #                                   car,
-        #                                   self.num_junctures,
-        #                                   should_record=run_best)
-        #         S = environment.state_encoding() # 0 2 0 0
-        #         total_R = 0
-        #         
-        #         while S is not None:
-        #             A = self.pick_action(S, run_best)
-        #             
-        #             I = self.q_index(S, A)
-        # 
-        #             R, S_ = environment.step(A)
-        # 
-        #             # Experiment: testing modified alpha
-        #             factor = 1
-        # #             if self.restarted:
-        # #                 n = self.N[S]
-        # #                 N0 = self.explorate
-        # #                 factor = n / (N0 + n)
-        # 
-        #             target = R + self.gamma * self.max_at_state(S_)
-        #             self.Q[I] += self.alpha * (target - self.Q[I]) * factor
-        #             self.C[I] += 1
-        #             self.N[S] += 1
-        #             if S_ is not None:
-        #                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
-        #             
-        #             S = S_
-        #             total_R += R
-        #             
-        #         return total_R, environment
         pass
     
     def collect_stats(self, ep, num_episodes):
         pass
     
+    def save_stats(self, pref=None):
+        pass
+
+    def load_stats(self, subdir, pref=None):
+        pass
+
     def report_stats(self, pref):
         pass
 
-    def saveToFile(self, pref=""):
+    def save_model(self, pref=""):
         pass
 
-            
+    def load_model(self, load_subdir):
+        pass

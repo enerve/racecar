@@ -6,6 +6,7 @@ Created on Sep 10, 2018
 
 import logging
 import numpy as np
+import os
 import time
 
 import matplotlib.pyplot as plt
@@ -35,6 +36,13 @@ def prefix(other_tym=None):
         ("%s_"%pre_problem if pre_problem else '') + \
         ("%s_"%pre_alg if pre_alg else '') + \
         ("%s_"%(other_tym or pre_tym))
+        
+def subdir(other_tym=None):
+    return (pre_outputdir if pre_outputdir else '') + \
+        ("%s_"%pre_problem if pre_problem else '') + \
+        ("%s_"%pre_alg if pre_alg else '') + \
+        ("%s_"%(other_tym or pre_tym)) + \
+        "/"
 
 def save_plot(pref=None):
     fname = prefix() \
@@ -77,6 +85,17 @@ class Plotter:
     def add_image(self, P, debuginfo=""):
         self.I_list.append((P, debuginfo))
         
+    def save(self, fname, pref=None):
+        dump(np.asarray([im[0] for im in self.I_list], dtype=np.float),
+             fname + "_I", pref)
+        dump(np.asarray([im[1] for im in self.I_list], dtype=np.str),
+             fname + "_D", pref)
+
+    def load(self, fname, subdir, pref=None):
+        ims = load(fname + "_I", subdir, pref)
+        debugs = load(fname + "_D", subdir, pref)
+        self.I_list = list(zip(ims, debugs))
+
     def play_animation(self, cmap='hot', vmin=None, vmax=None, 
                         show=True, save=True, pref=""):
         fig = plt.figure()
@@ -105,15 +124,20 @@ class Plotter:
             ani.save(prefix() + pref + '.mp4', writer=writer)
         plt.close()
 
-# ------ CSVs ---------
+# ------ Storing run data ---------
 
-def dump(A, pref):
-    fname = prefix() \
-        + ("%s_"%pref if pref else '') \
-        + '.csv'
-    np.savetxt(fname, A, delimiter=",")
+def dump(A, fname, suffix=None):
+    os.makedirs(subdir(), exist_ok=True)
+    fname = subdir() \
+        + fname \
+        + ("_%s"%suffix if suffix else '') \
+        + '.npy'
+    np.save(fname, A)
 
-def load(fname):
-    fname = (pre_outputdir if pre_outputdir else '') + \
-            fname
-    return np.genfromtxt(fname, delimiter=',')
+def load(fname, subdir=None, suffix=None):
+    fname = pre_outputdir \
+        + ("%s/"%subdir if subdir else '') \
+        + fname \
+        + ("_%s"%suffix if suffix else '') \
+        + '.npy'
+    return np.load(fname)

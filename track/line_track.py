@@ -100,6 +100,7 @@ class LineTrack(Track):
                                   'line_id': i,
                                   'point_id': None}
             if nearest_line is not None and nearest_line < i:
+                # Nearest line is behind us already, so
                 # we're not going to find anything better
                 break;
 

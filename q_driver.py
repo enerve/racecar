@@ -24,9 +24,7 @@ class QDriver(Driver):
                  num_speeds,
                  num_directions,
                  num_steer_positions,
-                 num_accel_positions,
-                 load_Q_filename=None,
-                 load_N_filename=None):
+                 num_accel_positions):
         '''
         Constructor
         '''
@@ -47,36 +45,18 @@ class QDriver(Driver):
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
         
         # Q is the learned value of a state/action
-        if load_Q_filename is not None:
-            self.logger.debug("Loading Q from: %s", load_Q_filename)
-            stored_Q = util.load(load_Q_filename)
-            self.Q = stored_Q.reshape((num_junctures,
-                                       num_lanes,
-                                       num_speeds,
-                                       num_directions,
-                                       num_steer_positions,
-                                       num_accel_positions))
-        else:
-            self.Q = np.zeros((num_junctures,
-                               num_lanes,
-                               num_speeds,
-                               num_directions,
-                               num_steer_positions,
-                               num_accel_positions))
+        self.Q = np.zeros((num_junctures,
+                           num_lanes,
+                           num_speeds,
+                           num_directions,
+                           num_steer_positions,
+                           num_accel_positions))
 
         # N is the count of visits to state
-        if load_N_filename is not None:
-            self.logger.debug("Loading N from: %s", load_N_filename)
-            stored_N = util.load(load_N_filename)
-            self.N = stored_N.reshape((num_junctures,
-                                       num_lanes,
-                                       num_speeds,
-                                       num_directions))
-        else:
-            self.N = np.zeros((self.num_junctures,
-                               self.num_lanes,
-                               self.num_speeds,
-                               self.num_directions), dtype=np.int32)
+        self.N = np.zeros((self.num_junctures,
+                           self.num_lanes,
+                           self.num_speeds,
+                           self.num_directions), dtype=np.int32)
                            
         # C is the count of visits to state/action
         self.C = np.zeros((num_junctures,
@@ -213,9 +193,9 @@ class QDriver(Driver):
         if ep > 0 and ep % (num_episodes // 200) == 0:
             self.stat_e_200.append(ep)
     
-            self.q_plotter.add_image(self.plottable(self.Q, (2, 3, 4, 5)))
-            self.qx_plotter.add_image(self.plottable(self.Q, (2, 3, 4, 5), pick_max=True))
-            self.c_plotter.add_image(self.plottable(self.C, (2, 3, 4, 5)))
+            self.q_plotter.add_image(self._plottable(self.Q, (2, 3, 4, 5)))
+            self.qx_plotter.add_image(self._plottable(self.Q, (2, 3, 4, 5), pick_max=True))
+            self.c_plotter.add_image(self._plottable(self.C, (2, 3, 4, 5)))
         
         #         if ep > 0 and ep % 10000 == 0:
         #             logger.debug("Done %d episodes", ep)
@@ -230,12 +210,53 @@ class QDriver(Driver):
         #                     labels.append("ms %d" % i)
         #                 util.plot(lines, labels, "Max juncture reached", pref="ms%d" %(ep // 1000))
 
+    def save_stats(self, pref=None):
+        util.dump(np.asarray(self.stat_qm, dtype=np.float),
+                  "dstats_qm", pref)
+        util.dump(np.asarray(self.stat_cm, dtype=np.float),
+                  "dstats_cm", pref)
+        util.dump(np.asarray(self.stat_rm, dtype=np.float),
+                  "dstats_rm", pref)
+        util.dump(np.asarray(self.stat_juncture_maxQ, dtype=np.float),
+                  "dstats_stat_juncture_maxQ", pref)
+        
+        A = np.asarray([
+            self.stat_e_100,
+            self.stat_dlm
+            ], dtype=np.float)
+        util.dump(A, "dstatsA", pref)
+
+        C = np.asarray(self.stat_e_200, dtype=np.float)
+        util.dump(C, "dstatsC", pref)
+        
+        self.q_plotter.save("q_plotter", pref)
+        self.qx_plotter.save("qx_plotter", pref)
+        self.c_plotter.save("c_plotter", pref)
+
+    def load_stats(self, subdir, pref=None):
+        self.stat_qm = util.load("dstats_qm", subdir, pref)
+        self.stat_cm = util.load("dstats_cm", subdir, pref)
+        self.stat_rm = util.load("dstats_rm", subdir, pref)
+        self.dstats_stat_juncture_maxQ =util.load(
+            "dstats_stat_juncture_maxQ", subdir, pref)
+        
+        A = util.load("dstatsA", subdir)
+        self.stat_e_100 = A[0]
+        self.stat_dlm = A[1]
+        
+        C = util.load("dstatsC", subdir)
+        self.stat_e_200 = C
+        
+        self.q_plotter.load("q_plotter", subdir, pref)
+        self.qx_plotter.load("qx_plotter", subdir, pref)
+        self.c_plotter.load("c_plotter", subdir, pref)
+    
     def report_stats(self, pref):
         super().report_stats(pref)
         
-        #self.q_plotter.play_animation(save=True, pref="QLanes")
+        self.q_plotter.play_animation(save=True, pref="QLanes")
         #self.qx_plotter.play_animation(show=True, save=True, pref="QMaxLanes_%s" % pref)
-        #self.c_plotter.play_animation(save=True, pref="CLanes")
+        self.c_plotter.play_animation(save=True, pref="CLanes")
 
         #         S_dqv = np.array(self.stat_debug_qv).T
         #         self.logger.debug("stat_debug_qv: \n%s", S_dqv.astype(np.int32))
@@ -254,15 +275,33 @@ class QDriver(Driver):
         #             labels.append("Jn %d" % i)
         #         util.plot(S_jmax, self.stat_e_100, labels, "Juncture max Q", pref="jmax")
         
-        self.plotQ(28, (1, 4, 5), "speed, direction")
-        self.plotQ(28, (1, 2, 3), "steering, accel") 
-        #self.plotQ(28, (2, 3, 4, 5), "lanes") 
+        self._plotQ(28, (1, 4, 5), "speed, direction")
+        self._plotQ(28, (1, 2, 3), "steering, accel") 
+        #self._plotQ(28, (2, 3, 4, 5), "lanes") 
 
         #         S_qm = np.array(stat_qm).T
         #         logger.debug("stat_qm: \n%s", S_qm.astype(np.int32))
         #         util.heatmap(S_qm, (0, EPISODES, driver.num_junctures, 0),
         #                      "Total Q per juncture over epochs", pref="QM")
         #     #        
+        #         S_cm = np.array(self.stat_cm).T
+        #         self.logger.debug("stat_cm: \n%s", S_cm.astype(np.int32))
+        #         util.heatmap(S_cm, (0, EPISODES, driver.num_junctures, 0),
+        #                      "Exploration per juncture over epochs", pref="CM")
+        #      
+        #         S_rm = np.array(self.stat_rm).T
+        #         self.logger.debug("stat_rm: \n%s", (100*S_rm).astype(np.int32))
+        #         util.heatmap(S_rm, (0, EPISODES, driver.num_junctures, 0),
+        #                      "Avg reward at juncture over epochs", cmap='winter',
+        #                      pref="RM")
+        #        
+        #         S_rm = S_rm[0:10]
+        #         labels = []
+        #         for i in range(len(S_rm)):
+        #             labels.append("ms %d" % i)
+        #         util.plot(S_rm, self.stat_e_100, labels, "Juncture reward", pref="rm")
+        
+        #
         #         #S_dq = S_qm[1:, :] - S_qm[:-1, :] # Q diff juncture to next juncture
         #         S_dq = S_qm[:, 1:] - S_qm[:, :-1] # Q diff epoch to next epoch
         #         logger.debug("stat_dq: \n%s", S_dq.shape)
@@ -272,20 +311,26 @@ class QDriver(Driver):
 
         #util.plot([self.stat_dlm], self.stat_e_100, ["Avg ΔQ"], pref="delta")
 
-    def plottable(self, X, axes, pick_max=False):
+    def _plottable(self, X, axes, pick_max=False):
         X = np.max(X, axis=axes) if pick_max else np.sum(X, axis=axes)
         return X.reshape(X.shape[0], -1).T
 
-    def plotQ(self, m, axes, t_suffix):
-        Q = self.plottable(self.Q, axes)
+    def _plotQ(self, m, axes, t_suffix):
+        Q = self._plottable(self.Q, axes)
         util.heatmap(Q, None, "Q total per juncture (%s)" % t_suffix,
                      pref="Q_%s" % t_suffix)
          
-        C = self.plottable(self.C, axes)    
+        C = self._plottable(self.C, axes)    
         util.heatmap(C, None, "Total updates per juncture (%s)" % t_suffix,
                      pref="C_%s" % t_suffix)
 
-    def saveToFile(self, pref=""):
-        M = self.num_junctures
-        util.dump(self.Q.reshape(M, -1), "Q_%s_%s" % (M, pref))
-        util.dump(self.N.reshape(M, -1), "N_%s_%s" % (M, pref))
+    def save_model(self, pref=""):
+        util.dump(self.Q, "Q")
+        util.dump(self.N, "N")
+        util.dump(self.C, "C")
+
+    def load_model(self, load_subdir):
+        self.logger.debug("Loading N, Q, C from: %s", load_subdir)
+        self.Q = util.load("Q", load_subdir)
+        self.N = util.load("N", load_subdir)
+        self.C = util.load("C", load_subdir)

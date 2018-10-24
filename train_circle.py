@@ -8,11 +8,11 @@ import logging
 
 from car import Car
 from track import CircleTrack
+from trainer import Trainer
 from q_driver import QDriver
 import cmd_line
 import log
 import util
-import trainer
 
 
 def main():
@@ -38,13 +38,20 @@ def main():
     NUM_ACCEL_POSITIONS = 3
 
     RADIUS = 98
-    track = CircleTrack((0, 0), RADIUS, 20, NUM_JUNCTURES,
+    WIDTH = 20
+    track = CircleTrack((0, 0), RADIUS, WIDTH, NUM_JUNCTURES,
                         NUM_MILESTONES, NUM_LANES)
     car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
-     
-     
-    #original_driver = QDriver(alpha=1, gamma=1, explorate=2500)
-    Q_filename = "RC_qlearn_341830_Q_50__.csv"
+
+    logger.debug("*Problem:\t%s", util.pre_problem)
+    logger.debug("   NUM_JUNCTURES:\t%s", NUM_JUNCTURES)
+    logger.debug("   NUM_MILESTONES:\t%s", NUM_MILESTONES)
+    logger.debug("   NUM_LANES:\t%s", NUM_LANES)
+    logger.debug("   MAX_SPEED:\t%s", MAX_SPEED)
+    logger.debug("   NUM_DIRECTIONS:\t%s", NUM_DIRECTIONS)
+    logger.debug("   NUM_STEER_POSITIONS:\t%s", NUM_STEER_POSITIONS)
+    logger.debug("   NUM_ACCEL_POSITIONS:\t%s", NUM_ACCEL_POSITIONS)
+    
     driver = QDriver(1, # alpha
                     1, # gamma
                     20, # explorate
@@ -53,12 +60,16 @@ def main():
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS,
-                    load_Q_filename=Q_filename)
-    #driver = Driver(alpha=0.2, gamma=1, load_filename="RC_qlearn_652042_Q_28_.csv")
-    #trainer.train(driver, track, car, 400*1000)
-    #trainer.play_best(driver, track, car)
-    driver.report_stats("static")
+                    NUM_ACCEL_POSITIONS)
+    trainer = Trainer(driver, track, car)
+    #subdir = "RC rect_qlearn_100_1.0_1.0_363312_"
+    subdir = None
+    if subdir:
+        driver.load_model(subdir)
+        trainer.load_stats(subdir)
+    trainer.train(400*1000)
+    trainer.report_stats()
+    trainer.play_best()
              
 
     # --------- CV ---------
