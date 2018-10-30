@@ -8,6 +8,7 @@ import logging
 
 from environment import Environment
 from car import Car
+from manual_driver import ManualDriver
 from track import LineTrack
 import trainer
 
@@ -55,6 +56,33 @@ def test():
             (1, 2),
             (1, 2),
             (1, 1),
+            (0, 1),
+            (0, 1),
+            (0, 1),
+            (0, 1),
+            (0, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            #(1, 1),
+            (0, 1),
+            (0, 1),
+            (0, 1),
+            (0, 1),
+            (0, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
+            (1, 1),
             (1, 1),
             (1, 1),
             (0, 1),
@@ -68,32 +96,7 @@ def test():
             (1, 1),
             (1, 1),
             (1, 1),
-            (0, 1),
-            (0, 1),
-            (0, 1),
-            (0, 1),
-            (0, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (0, 1),
-            (0, 1),
-            (0, 1),
-            (0, 1),
-            (0, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
-            (1, 1),
+            #(1, 1),
             (0, 1),
             (0, 1),
             (0, 1),
@@ -109,9 +112,20 @@ def test():
         ]
 #     logger.debug("About to drive manual")
 
-    environment = Environment(track, car, NUM_JUNCTURES,
-                              should_record=True)
-    trainer.drive_manual(environment, MY_IDEAL_A)
+    driver = ManualDriver(
+        NUM_JUNCTURES,
+        NUM_LANES,
+        NUM_SPEEDS,
+        NUM_DIRECTIONS,
+        NUM_STEER_POSITIONS,
+        NUM_ACCEL_POSITIONS,
+        MY_IDEAL_A)
+    
+    total_R, environment = driver.run_episode(track, car)
+    logger.debug("Total_R: %s", total_R)
+    environment.report_history()
+    environment.play_movie(save=False, pref="bestmovie")
+    
     
 if __name__ == '__main__':
     test()

@@ -19,7 +19,7 @@ class Trainer:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-    def train(self, num_episodes, seed=10, pref=''):
+    def train(self, num_episodes, seed=10, pref='', save_to_file=True):
     
         random.seed(seed)
         
@@ -31,6 +31,8 @@ class Trainer:
         self.stat_bestpath_times = []
         # track recent average of rewards collected, as iterations progress
         self.stat_recent_total_R = []
+        self.stat_bestpath_R = []
+        self.stat_bestpath_juncture = []
         self.stat_e_bp = []
         
         self.stat_m = []#[] for _ in range(driver.num_junctures + 1)]
@@ -48,7 +50,6 @@ class Trainer:
         for ep in range(num_episodes):
             total_R, environment = self.driver.run_episode(self.track, self.car)
     
-                
             count_m[ep % smooth] = Eye[environment.curr_juncture]
             
             if environment.curr_juncture >= 10:
@@ -92,7 +93,7 @@ class Trainer:
             self.driver.collect_stats(ep, num_episodes)
                     
     
-            if ep > 0 and ep % (num_episodes // 1000) == 0:
+            if util.checkpoint_reached(ep, num_episodes // 200):
                 self.stat_e_1000.append(ep)
                 self.stat_m.append(count_m.sum(axis=0))
                 #for sm, c in zip(stat_m, count_m.sum(axis=0)):
@@ -104,27 +105,34 @@ class Trainer:
             len_bp_split = (num_episodes // 100)
             recent_total_R += (total_R - recent_total_R) * 10 / len_bp_split
             if ep > 0 and ep % len_bp_split == len_bp_split - 1:
-                bestpath_env = self.best_environment()
+                bestpath_R, bestpath_env = self.driver.run_episode(self.track, 
+                                                                   self.car, 
+                                                                   run_best=True)
                 self.stat_bestpath_times.append(bestpath_env.total_time_taken() 
                                            if bestpath_env.has_reached_finish() 
                                            else 500)
+                self.stat_bestpath_R.append(bestpath_R)
                 self.stat_e_bp.append(ep)
                 self.stat_recent_total_R.append(recent_total_R)
+                self.stat_bestpath_juncture.append(bestpath_env.curr_juncture)
                 
     
-            if ep > 0 and ep % 10000 == 0:
+            if util.checkpoint_reached(ep, 1000):
                 self.logger.debug("Ep %d ", ep)
                 
     
         self.logger.debug("Completed training in %d seconds", time.clock() - start_time)
     
-        # save learned values to file
-        self.driver.save_model(pref=pref)
-        
-        # save stats to file
-        self.save_stats(pref=pref)        
+        if save_to_file:
+            # save learned values to file
+            self.driver.save_model(pref=pref)
+            
+            # save stats to file
+            self.save_stats(pref=pref)        
     
-        return (self.stat_bestpath_times, self.stat_e_bp)
+        return (self.stat_bestpath_times, self.stat_e_bp,
+                self.stat_bestpath_R, self.stat_bestpath_juncture)
+    
     
     def save_stats(self, pref=None):
         self.driver.save_stats(pref=pref)
@@ -132,7 +140,8 @@ class Trainer:
         A = np.asarray([
             self.stat_bestpath_times,
             self.stat_recent_total_R,
-            self.stat_e_bp
+            self.stat_e_bp,
+            self.stat_bestpath_R,
             ], dtype=np.float)
         util.dump(A, "statsA", pref)
     
@@ -151,6 +160,7 @@ class Trainer:
         self.stat_bestpath_times = A[0]
         self.stat_recent_total_R = A[1]
         self.stat_e_bp = A[2]
+        self.stat_bestpath_R = A[3]
         
         B = util.load("statsB", subdir, pref)
         self.stat_m = B
@@ -162,8 +172,10 @@ class Trainer:
         self.driver.report_stats(pref=pref)
         
         util.plot([[10*x for x in self.stat_bestpath_times],
-                   self.stat_recent_total_R], self.stat_e_bp,
-                  ["Finish time by best-action path", "Recent avg total reward"],
+                   self.stat_recent_total_R, self.stat_bestpath_R],
+                  self.stat_e_bp,
+                  ["Finish time by best-action path", "Recent avg total reward",
+                   "Reward for best-action path"],
                   title="Performance over time",
                   pref="bpt")
         
@@ -192,17 +204,3 @@ class Trainer:
         total_R, environment = self.driver.run_episode(self.track, self.car, 
                                                        run_best=True)
         return environment
-    
-    def drive_manual(self, environment, manual_actions):
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.DEBUG)
-    
-        for A in manual_actions:
-            R, S_ = environment.step(A)
-            logger.debug(" A:%s  R:%d    S:%s" % (A, R, S_,))
-            if S_ is None:
-                break
-    
-        environment.report_history()
-        environment.play_movie(save=False, pref="bestmovie")
-

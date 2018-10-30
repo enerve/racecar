@@ -21,6 +21,17 @@ class Environment(object):
     for the Driver.
     '''
     
+    #     R_time_step = -1
+    #     R_crash = 0
+    #     R_progress = 5000
+    #     R_finishline = 0
+    #     R_milestone = 10
+    R_time_step = -10
+    R_crash = 0
+    R_progress = 0
+    R_finishline = 0
+    R_milestone = 100
+    
     def __init__(self, track, car, num_junctures, should_record=False):
         '''
         Constructor
@@ -66,14 +77,14 @@ class Environment(object):
             self.car.move()
             self.curr_time += 1
             #self.logger.debug("Location: %s", (self.car.location, ))
-            R += -1
+            R += self.R_time_step
             self.track_anchor = self.track.anchor(self.car.location, self.track_anchor)
             if not self.track.is_inside(self.track_anchor):
                 # Car has crashed!
                 #self.logger.debug("Car crashed")
                 # Think of this R as a penalty for untravelled track (plus 5000)
-                R += 5000 * self.last_progress
-        
+                R += self.R_crash
+                R += self.R_progress * self.last_progress
                 return (R, None)
             self.last_progress = self.track.progress_made(self.track_anchor)
             if not self.track.within_milestone(self.track_anchor, 
@@ -83,7 +94,7 @@ class Environment(object):
                 self.curr_milestone += 1
                 #self.logger.debug("milestone %d reached", self.curr_milestone)
                 next_milestone = (self.curr_milestone + 1) % self.num_milestones
-                R += 10
+                R += self.R_milestone
                 #TODO: maybe there are multiple milestones to "jump"
             if not self.track.within_juncture(self.track_anchor, 
                                               self.curr_juncture,
@@ -103,7 +114,8 @@ class Environment(object):
             if self.curr_juncture == self.num_junctures:
                 self.reached_finish = True
                 #self.logger.debug("Reached finish line")
-                R += 5000 * 1 # 100 percent
+                R += self.R_finishline
+                R += self.R_progress * 1 # 100%
                 return (R, None)
 
             # if curr juncture now covers location, stop advancing juncture
@@ -141,8 +153,10 @@ class Environment(object):
         for vect, act in zip(self.car.vector_history, self.car.action_history):
             steer, accel = act
             dirn, sp = vect
-            self.logger.info("  Steered %d with Accel %d, dirn %d, speed %d", 
-                              steer-1, accel-1, dirn, sp)
+            self.logger.info("  Steered %s with Accel %s, dirn %d, speed %d", 
+                              ['L', '_', 'R'][steer], 
+                              ['-1', '0', '+1'][accel],
+                              dirn, sp)
         self.logger.info("  SteersA: %s", [a[0] for a in self.car.action_history])
         self.logger.info("  AccelsA: %s", [a[1] for a in self.car.action_history])
         self.logger.info("  Total time taken: %d", self.curr_time)

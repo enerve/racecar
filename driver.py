@@ -53,9 +53,6 @@ class Driver(object):
     def restart_exploration(self):
         pass
     
-    def pick_action(self, S, run_best):  
-        pass
-    
     def run_episode(self, track, car, run_best=False):
         pass
     

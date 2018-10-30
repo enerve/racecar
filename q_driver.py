@@ -101,7 +101,7 @@ class QDriver(Driver):
         self.avg_delta = 0
         self.restarted = True
 
-    def pick_action(self, S, run_best):
+    def _pick_action(self, S, run_best):
         if run_best:
             epsilon = 0
         else:
@@ -131,23 +131,18 @@ class QDriver(Driver):
     def max_at_state(self, S):
         return 0 if S is None else np.max(self.Q[S])
         
-    def q_index(self, state, action):
-        m, l, v, d = state
-        s, a = action
-        return (m, l, v, d, s, a)
-
     def run_episode(self, track, car, run_best=False):
         environment = Environment(track,
                                   car,
                                   self.num_junctures,
                                   should_record=run_best)
-        S = environment.state_encoding() # 0 2 0 0
+        S = environment.state_encoding()
         total_R = 0
         
         while S is not None:
-            A = self.pick_action(S, run_best)
+            A = self._pick_action(S, run_best)
             
-            I = self.q_index(S, A)
+            I = S + A
 
             R, S_ = environment.step(A)
 
@@ -169,7 +164,7 @@ class QDriver(Driver):
     def collect_stats(self, ep, num_episodes):
         super().collect_stats(ep, num_episodes)
         
-        if ep > 0 and ep % (num_episodes // 100) == 0:
+        if util.checkpoint_reached(ep, num_episodes // 100):
             self.stat_e_100.append(ep)
 
             self.stat_qm.append(self.Q.sum(axis=(1,2,3,4,5)))
@@ -190,7 +185,7 @@ class QDriver(Driver):
             self.stat_juncture_maxQ.append(np.max(self.Q, axis=(1,2,3,4,5)))
             self.stat_dlm.append(self.avg_delta)
 
-        if ep > 0 and ep % (num_episodes // 200) == 0:
+        if util.checkpoint_reached(ep, num_episodes // 200):
             self.stat_e_200.append(ep)
     
             self.q_plotter.add_image(self._plottable(self.Q, (2, 3, 4, 5)))
@@ -254,9 +249,9 @@ class QDriver(Driver):
     def report_stats(self, pref):
         super().report_stats(pref)
         
-        self.q_plotter.play_animation(save=True, pref="QLanes")
+        #self.q_plotter.play_animation(save=True, pref="QLanes")
         #self.qx_plotter.play_animation(show=True, save=True, pref="QMaxLanes_%s" % pref)
-        self.c_plotter.play_animation(save=True, pref="CLanes")
+        #self.c_plotter.play_animation(save=True, pref="CLanes")
 
         #         S_dqv = np.array(self.stat_debug_qv).T
         #         self.logger.debug("stat_debug_qv: \n%s", S_dqv.astype(np.int32))
@@ -275,8 +270,8 @@ class QDriver(Driver):
         #             labels.append("Jn %d" % i)
         #         util.plot(S_jmax, self.stat_e_100, labels, "Juncture max Q", pref="jmax")
         
-        self._plotQ(28, (1, 4, 5), "speed, direction")
-        self._plotQ(28, (1, 2, 3), "steering, accel") 
+        #self._plotQ(28, (1, 4, 5), "speed, direction")
+        #self._plotQ(28, (1, 2, 3), "steering, accel") 
         #self._plotQ(28, (2, 3, 4, 5), "lanes") 
 
         #         S_qm = np.array(stat_qm).T
@@ -291,7 +286,7 @@ class QDriver(Driver):
         #      
         #         S_rm = np.array(self.stat_rm).T
         #         self.logger.debug("stat_rm: \n%s", (100*S_rm).astype(np.int32))
-        #         util.heatmap(S_rm, (0, EPISODES, driver.num_junctures, 0),
+        #         util.heatmap(S_rm, (0, self.stat_e_100[-1], self.num_junctures, 0),
         #                      "Avg reward at juncture over epochs", cmap='winter',
         #                      pref="RM")
         #        
@@ -309,7 +304,7 @@ class QDriver(Driver):
         #         util.heatmap(S_dq, (0, EPISODES, driver.num_junctures, 0),
         #                      "Diff Q per juncture over epochs", pref="DQ")
 
-        #util.plot([self.stat_dlm], self.stat_e_100, ["Avg ΔQ"], pref="delta")
+        util.plot([self.stat_dlm], self.stat_e_100, ["Avg ΔQ"], pref="delta")
 
     def _plottable(self, X, axes, pick_max=False):
         X = np.max(X, axis=axes) if pick_max else np.sum(X, axis=axes)

@@ -9,8 +9,7 @@ import logging
 from environment import Environment
 from car import Car
 from track import CircleTrack
-from driver import Driver
-import trainer
+from manual_driver import ManualDriver
 
 import cmd_line
 import log
@@ -39,7 +38,7 @@ def test():
 
     RADIUS = 98
     track = CircleTrack((0, 0), RADIUS, 20, NUM_JUNCTURES,
-                        Environment.NUM_MILESTONES, NUM_LANES)
+                        NUM_MILESTONES, NUM_LANES)
     NUM_SPEEDS = 3
     car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
 
@@ -76,7 +75,18 @@ def test():
 
     environment = Environment(track, car, NUM_JUNCTURES,
                               should_record=True)
-    trainer.drive_manual(environment, MY_IDEAL_A)
+    driver = ManualDriver(
+        NUM_JUNCTURES,
+        NUM_LANES,
+        NUM_SPEEDS,
+        NUM_DIRECTIONS,
+        NUM_STEER_POSITIONS,
+        NUM_ACCEL_POSITIONS,
+        MY_IDEAL_A)
+    total_R, environment = driver.run_episode(track, car)
+    logger.debug("Total_R: %s", total_R)
+    environment.report_history()
+    environment.play_movie(save=False, pref="bestmovie")
     
 if __name__ == '__main__':
     test()

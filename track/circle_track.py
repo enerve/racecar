@@ -31,7 +31,7 @@ class CircleTrack(Track):
         start_dir = 0  # in degrees, Right==0, Left==180
         return (start_loc, start_dir)
 
-    def anchor(self, location):
+    def anchor(self, location, prev_anchor=None):
         (x, y) = location
         (a, b) = self.center
         d = math.sqrt((x - a) ** 2 + (y - b) ** 2)

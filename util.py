@@ -39,9 +39,9 @@ def prefix(other_tym=None):
         
 def subdir(other_tym=None):
     return (pre_outputdir if pre_outputdir else '') + \
+        ("%s_"%(other_tym or pre_tym)) + \
         ("%s_"%pre_problem if pre_problem else '') + \
         ("%s_"%pre_alg if pre_alg else '') + \
-        ("%s_"%(other_tym or pre_tym)) + \
         "/"
 
 def save_plot(pref=None):
@@ -74,6 +74,13 @@ def plot_all(lines, xs, labels, title=None, pref=None):
         x = xs[i]
         plt.plot(x, l, label=labels[i])
     plt.legend()
+    save_plot(pref)
+    plt.show()
+    
+def scatter(x, y, values, xlabel, ylabel, pref=None):
+    plt.scatter(x, y, c=values)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     save_plot(pref)
     plt.show()
 
@@ -123,6 +130,10 @@ class Plotter:
             logging.getLogger("matplotlib.animation").setLevel(logging.INFO)
             ani.save(prefix() + pref + '.mp4', writer=writer)
         plt.close()
+
+def checkpoint_reached(ep, checkpoint_divisor):
+    return checkpoint_divisor > 0 and \
+        ep > 0 and ep % checkpoint_divisor == 0
 
 # ------ Storing run data ---------
 

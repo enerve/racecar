@@ -10,8 +10,10 @@ from car import Car
 from track import CircleTrack
 from trainer import Trainer
 from q_driver import QDriver
+from q_lambda_driver import QLambdaDriver
 import cmd_line
 import log
+import numpy as np
 import util
 
 
@@ -73,6 +75,61 @@ def main():
              
 
     # --------- CV ---------
+#     import random
+#     lambdas = []
+#     alphas = []
+#     scores = []
+#     expls = []
+# 
+# 
+#     for rep in range(20):
+#         lam = random.random() 
+#         alp = random.uniform(0.3, 1.0)
+#         expl = 10 ** random.uniform(1.0, 3)
+#         logger.debug("--- rep %d --- lam: %0.2f, alp: %0.2f, expl: %0.2f", 
+#                      rep, lam, alp, expl)
+#         
+#         driver = QLambdaDriver(lam, # lambda
+#                         alp, # alpha
+#                         1, # gamma
+#                         expl, # explorate
+#                         NUM_JUNCTURES,
+#                         NUM_LANES,
+#                         NUM_SPEEDS,
+#                         NUM_DIRECTIONS,
+#                         NUM_STEER_POSITIONS,
+#                         NUM_ACCEL_POSITIONS)
+#         trainer = Trainer(driver, track, car)
+#         bp_times, e_bp, bp_R, bp_j = trainer.train(20*1000, save_to_file=False,
+#                                              seed = 513 + rep)
+#         #bp_R=[random.randrange(20, 1000)]
+#                 
+#         lambdas.append(lam)
+#         alphas.append(alp)
+#         expls.append(expl)
+#                
+#         score = 0
+#         for i in range(5):
+#             score += bp_R[-1-i] / bp_j[-1-i]
+#         score /= 5
+#         scores.append(score)
+#         logger.debug("  Score: %s", score)
+#             
+#  
+#  
+#         logger.debug("lambdas.extend( %s)", lambdas)
+#         logger.debug("alphas.extend(  %s)", alphas)
+#         logger.debug("expls.extend(   %s)", expls)
+#         logger.debug("scores.extend(  %s)", scores)
+#        
+#     util.scatter(np.array(lambdas), np.array(alphas), np.array(scores),
+#                  "lambda", "alpha", pref="cv_la")
+#     util.scatter(np.array(lambdas), np.array(expls), np.array(scores),
+#                  "lambda", "expl", pref="cv_le")
+#     util.scatter(np.array(expls), np.array(alphas), np.array(scores),
+#                  "expl", "alpha", pref="cv_ea")
+
+
 #     explorates = [10, 100, 1000, 10000]
 #     stats_bp_times = []
 #     stats_e_bp = []
