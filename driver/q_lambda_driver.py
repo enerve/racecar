@@ -7,7 +7,7 @@ Created on Oct 24, 2018
 import logging
 import numpy as np
 
-from q_driver import QDriver
+from driver.q_driver import QDriver
 from environment import Environment
 import util
 

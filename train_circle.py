@@ -9,8 +9,7 @@ import logging
 from car import Car
 from track import CircleTrack
 from trainer import Trainer
-from q_driver import QDriver
-from q_lambda_driver import QLambdaDriver
+from driver import QDriver, QLambdaDriver
 import cmd_line
 import log
 import numpy as np

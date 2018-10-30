@@ -7,8 +7,7 @@ Created on Sep 14, 2018
 import logging
 
 from car import Car
-from q_driver import QDriver
-from q_lambda_driver import QLambdaDriver
+from driver import QDriver, QLambdaDriver
 from track import LineTrack
 from trainer import Trainer
 import cmd_line

@@ -9,7 +9,7 @@ import logging
 from environment import Environment
 from car import Car
 from track import CircleTrack
-from manual_driver import ManualDriver
+from driver import ManualDriver
 
 import cmd_line
 import log
