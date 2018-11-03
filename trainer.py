@@ -151,6 +151,8 @@ class Trainer:
         C = np.asarray(self.stat_e_1000, dtype=np.float)
         util.dump(C, "statsC", pref)
         
+        # TODO: Save and load #episodes done in total
+        
     def load_stats(self, subdir, pref=None):
         self.driver.load_stats(subdir, pref)
     

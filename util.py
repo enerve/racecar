@@ -51,7 +51,7 @@ def save_plot(pref=None):
     plt.savefig(fname, bbox_inches='tight')
 
 def heatmap(P, extent, title=None, cmap='hot', pref=None):
-    plt.imshow(P, cmap=cmap, interpolation='none', extent=extent, aspect='equal')
+    plt.imshow(P, cmap=cmap, interpolation='none', extent=extent, aspect='auto')
     #plt.axis('off')
     if title is not None:
         plt.title(title)

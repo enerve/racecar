@@ -7,7 +7,7 @@ Created on Sep 14, 2018
 import logging
 
 from car import Car
-from driver import QDriver, QLambdaDriver
+from driver import *
 from track import LineTrack
 from trainer import Trainer
 import cmd_line
@@ -43,7 +43,7 @@ def main():
             (10, 10)
         ]
     NUM_JUNCTURES = 200
-    NUM_MILESTONES = 100
+    NUM_MILESTONES = 200
     NUM_LANES = 5
     MAX_SPEED = NUM_SPEEDS = 3
     NUM_DIRECTIONS = 20
@@ -71,9 +71,19 @@ def main():
     logger.debug("   NUM_STEER_POSITIONS:\t%s", NUM_STEER_POSITIONS)
     logger.debug("   NUM_ACCEL_POSITIONS:\t%s", NUM_ACCEL_POSITIONS)
     
-    driver = QDriver(1, # alpha
+#     driver = QDriver(1, # alpha
+#                     1, # gamma
+#                     10, # explorate
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+    driver = SarsaLambdaDriver(0.9, # lambda
+                    0.2, # alpha
                     1, # gamma
-                    10, # explorate
+                    400, # explorate
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
@@ -81,12 +91,12 @@ def main():
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
     trainer = Trainer(driver, track, car)
-    #subdir = "RC rect_qlearn_100_1.0_1.0_363312_"
-    subdir = None
-    if subdir:
-        driver.load_model(subdir)
-        trainer.load_stats(subdir)
-    trainer.train(10*1000)
+    
+    subdir = "212870_RC X_sarsa_lambda_400_0.2_1.0_0.9_"
+    driver.load_model(subdir)
+    trainer.load_stats(subdir)
+    trainer.train(100*1000)
+
     trainer.report_stats()
     trainer.play_best()
              

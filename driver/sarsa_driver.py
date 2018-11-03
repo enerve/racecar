@@ -1,5 +1,5 @@
 '''
-Created on Sep 6, 2018
+Created on Oct 30, 2018
 
 @author: enerve
 '''
@@ -11,10 +11,10 @@ from . import SADriver
 from environment import Environment
 import util
 
-class QDriver(SADriver):
+class SarsaDriver(SADriver):
     '''
     An agent that learns to drive a car along a track, optimizing using 
-    Q-learning
+    Sarsa
     '''
 
     def __init__(self, alpha, gamma, explorate,
@@ -39,7 +39,7 @@ class QDriver(SADriver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        util.pre_alg = "qlearn_%d_%0.1f_%0.1f" % (explorate, alpha, gamma)
+        util.pre_alg = "sarsa_%d_%0.1f_%0.1f" % (explorate, alpha, gamma)
         self.logger.debug("Algorithm: %s", util.pre_alg)
 
         self.alpha = alpha  # learning rate for updating Q
@@ -52,14 +52,19 @@ class QDriver(SADriver):
         S = environment.state_encoding()
         total_R = 0
         
+        A_ = None
+        A = self._pick_action(S, run_best)
         while S is not None:
-            A = self._pick_action(S, run_best)
-            
             I = S + A
 
             R, S_ = environment.step(A)
+            
+            Q_at_next = 0
+            if S_ is not None:
+                A_ = self._pick_action(S_, run_best)
+                Q_at_next = self.Q[S_ + A_]
 
-            target = R + self.gamma * self._max_at_state(S_)
+            target = R + self.gamma * Q_at_next
             delta = (target - self.Q[I])
             self.Q[I] += self.alpha * delta
             self.C[I] += 1
@@ -69,7 +74,7 @@ class QDriver(SADriver):
             if self.C[I] > 1:
                 self.avg_delta += 0.02 * (delta - self.avg_delta)
 
-            S = S_
+            S, A = S_, A_
             total_R += R
             
         return total_R, environment

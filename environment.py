@@ -27,7 +27,7 @@ class Environment(object):
     #     R_finishline = 0
     #     R_milestone = 10
     R_time_step = -10
-    R_crash = 0
+    R_crash = -200
     R_progress = 0
     R_finishline = 0
     R_milestone = 100
@@ -146,6 +146,9 @@ class Environment(object):
         v, d = self.car.state_encoding()
         return j, l, v, d
 
+    def get_action_history(self):
+        return self.car.action_history
+    
     def report_history(self):
         if not self.should_record:
             return

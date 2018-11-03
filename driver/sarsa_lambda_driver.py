@@ -1,5 +1,5 @@
 '''
-Created on Oct 24, 2018
+Created on Nov 1, 2018
 
 @author: enerve
 '''
@@ -11,10 +11,10 @@ from . import SADriver
 from environment import Environment
 import util
 
-class QLambdaDriver(SADriver):
+class SarsaLambdaDriver(SADriver):
     '''
     An agent that learns to drive a car along a track, optimizing using 
-    Q-lambda
+    Sarsa-lambda
     '''
 
     def __init__(self, lam, alpha, gamma, explorate,
@@ -40,8 +40,9 @@ class QLambdaDriver(SADriver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        util.pre_alg = "q_lambda_%d_%0.1f_%0.1f_%0.1f" % (explorate, alpha,
-                                                          gamma, lam)
+        util.pre_alg = "sarsa_lambda_%d_%0.1f_%0.1f_%0.1f" % (explorate, 
+                                                              alpha,
+                                                              gamma, lam)
         self.logger.debug("Algorithm: %s", util.pre_alg)
 
         self.lam = lam      # lookahead parameter
@@ -64,7 +65,7 @@ class QLambdaDriver(SADriver):
         # Eligibility
         num_E = 0
         self.num_resets += 1
-        Q_at_chosen_next = 0  # initialization doesn't matter
+        #Q_at_chosen_next = 0  # initialization doesn't matter
         
         
         A = self._pick_action(S, run_best)
@@ -79,8 +80,10 @@ class QLambdaDriver(SADriver):
             if S_ is not None:
                 A_ = self._pick_action(S_, run_best)
                 Q_at_chosen_next = self.Q[S_ + A_]
+            else:
+                Q_at_chosen_next = 0
 
-            target = R + self.gamma * Q_at_max_next
+            target = R + self.gamma * Q_at_chosen_next
             delta = (target - self.Q[I])
             self.eligible_states[num_E] = I
             num_E += 1
@@ -107,8 +110,8 @@ class QLambdaDriver(SADriver):
             
         return total_R, environment
 
-    def run_episode_vectorized(self, track, car, run_best=False):
-        ''' Uses a vectorized implementation of Q-lambda's Eligibility
+    def run_episode_slow(self, track, car, run_best=False):
+        ''' Uses a slower implementation of Q-lambda's Eligibility
         '''
         environment = Environment(track,
                                   car,
@@ -121,7 +124,7 @@ class QLambdaDriver(SADriver):
         E = np.zeros_like(self.Q)
         #num_E = 0
         self.num_resets += 1
-        Q_at_chosen_next = 0  # initialization doesn't matter
+        #Q_at_chosen_next = 0  # initialization doesn't matter
          
          
         A = self.pick_action(S, run_best)
@@ -135,8 +138,10 @@ class QLambdaDriver(SADriver):
             if S_ is not None:
                 A_ = self.pick_action(S_, run_best)
                 Q_at_chosen_next = self.Q[S_ + A_]
+            else:
+                Q_at_chosen_next = 0
  
-            target = R + self.gamma * Q_at_max_next
+            target = R + self.gamma * Q_at_chosen_next
             delta = (target - self.Q[I])
             E[I] += 1
             self.Q += self.alpha * delta * E

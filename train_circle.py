@@ -9,7 +9,7 @@ import logging
 from car import Car
 from track import CircleTrack
 from trainer import Trainer
-from driver import QDriver, QLambdaDriver
+from driver import *
 import cmd_line
 import log
 import numpy as np
@@ -53,9 +53,28 @@ def main():
     logger.debug("   NUM_STEER_POSITIONS:\t%s", NUM_STEER_POSITIONS)
     logger.debug("   NUM_ACCEL_POSITIONS:\t%s", NUM_ACCEL_POSITIONS)
     
-    driver = QDriver(1, # alpha
+#     driver = QDriver(1, # alpha
+#                     1, # gamma
+#                     20, # explorate
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+#     driver = SarsaDriver(0.2, # alpha
+#                     1, # gamma
+#                     200, # explorate
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+    driver = SarsaLambdaDriver(0.9, # lambda
+                    0.2, # alpha
                     1, # gamma
-                    20, # explorate
+                    200, # explorate
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
@@ -68,10 +87,19 @@ def main():
     if subdir:
         driver.load_model(subdir)
         trainer.load_stats(subdir)
-    trainer.train(400*1000)
+    trainer.train(15*1000)
     trainer.report_stats()
+    
     trainer.play_best()
-             
+    best_env = trainer.best_environment()
+    debug_driver = ManualDriver(NUM_JUNCTURES,
+                                NUM_LANES,
+                                NUM_SPEEDS,
+                                NUM_DIRECTIONS,
+                                NUM_STEER_POSITIONS,
+                                NUM_ACCEL_POSITIONS,
+                                best_env.get_action_history())
+    debug_driver.run_episode(track, car)
 
     # --------- CV ---------
 #     import random

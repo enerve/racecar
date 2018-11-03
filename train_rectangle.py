@@ -7,7 +7,7 @@ Created on Sep 14, 2018
 import logging
 
 from car import Car
-from driver import QDriver, QLambdaDriver
+from driver import *
 from track import LineTrack
 from trainer import Trainer
 import cmd_line
@@ -67,22 +67,42 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-    driver = QLambdaDriver(0.35, # lambda
-                    0.7, # alpha
+#     driver = QLambdaDriver(0.35, # lambda
+#                     0.7, # alpha
+#                     1, # gamma
+#                     76, # explorate
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+#     driver = SarsaDriver(0.2, # alpha
+#                     1, # gamma
+#                     200, # explorate
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+    driver = SarsaLambdaDriver(0.9, # lambda
+                    0.2, # alpha
                     1, # gamma
-                    76, # explorate
+                    200, # explorate
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
+
     trainer = Trainer(driver, track, car)
       
 #     subdir = "463503_RC rect_q_lambda_100_0.8_1.0_0.9_"
 #     driver.load_model(subdir)
 #     trainer.load_stats(subdir)
-    trainer.train(20 * 1000, seed=4321)
+    trainer.train(50 * 1000)
       
     trainer.report_stats()
     trainer.play_best()
