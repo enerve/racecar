@@ -14,6 +14,7 @@ import cmd_line
 import log
 import util
 import numpy as np
+import random
 
 def main():
     args = cmd_line.parse_args()
@@ -57,6 +58,10 @@ def main():
     logger.debug("   NUM_DIRECTIONS:\t%s", NUM_DIRECTIONS)
     logger.debug("   NUM_STEER_POSITIONS:\t%s", NUM_STEER_POSITIONS)
     logger.debug("   NUM_ACCEL_POSITIONS:\t%s", NUM_ACCEL_POSITIONS)
+
+    seed = 123
+    random.seed(seed)
+    np.random.seed(seed)
     
 #     driver = QDriver(1, # alpha
 #                     1, # gamma
@@ -109,7 +114,6 @@ def main():
 
 
     # --------- CV ---------
-    import random
     lambdas = []
     alphas = []
     scores = []

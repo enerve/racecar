@@ -13,6 +13,7 @@ from driver import *
 import cmd_line
 import log
 import numpy as np
+import random
 import util
 
 
@@ -53,6 +54,10 @@ def main():
     logger.debug("   NUM_STEER_POSITIONS:\t%s", NUM_STEER_POSITIONS)
     logger.debug("   NUM_ACCEL_POSITIONS:\t%s", NUM_ACCEL_POSITIONS)
     
+    seed = 123
+    random.seed(seed)
+    np.random.seed(seed)
+
 #     driver = QDriver(1, # alpha
 #                     1, # gamma
 #                     20, # explorate
@@ -71,7 +76,17 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-    driver = SarsaLambdaDriver(0.9, # lambda
+#     driver = SarsaLambdaDriver(0.9, # lambda
+#                     0.2, # alpha
+#                     1, # gamma
+#                     200, # explorate
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+    driver = SarsaRegressionDriver(
                     0.2, # alpha
                     1, # gamma
                     200, # explorate
@@ -87,19 +102,19 @@ def main():
     if subdir:
         driver.load_model(subdir)
         trainer.load_stats(subdir)
-    trainer.train(15*1000)
+    trainer.train(20*1000)
     trainer.report_stats()
     
-    trainer.play_best()
-    best_env = trainer.best_environment()
-    debug_driver = ManualDriver(NUM_JUNCTURES,
-                                NUM_LANES,
-                                NUM_SPEEDS,
-                                NUM_DIRECTIONS,
-                                NUM_STEER_POSITIONS,
-                                NUM_ACCEL_POSITIONS,
-                                best_env.get_action_history())
-    debug_driver.run_episode(track, car)
+    #trainer.play_best()
+#     best_env = trainer.best_environment()
+#     debug_driver = ManualDriver(NUM_JUNCTURES,
+#                                 NUM_LANES,
+#                                 NUM_SPEEDS,
+#                                 NUM_DIRECTIONS,
+#                                 NUM_STEER_POSITIONS,
+#                                 NUM_ACCEL_POSITIONS,
+#                                 best_env.get_action_history())
+#     debug_driver.run_episode(track, car)
 
     # --------- CV ---------
 #     import random

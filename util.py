@@ -58,13 +58,15 @@ def heatmap(P, extent, title=None, cmap='hot', pref=None):
     save_plot(pref)
     plt.show()
 
-def plot(lines, x, labels, title=None, pref=None):
+def plot(lines, x, labels, title=None, pref=None, ylim=None):
     for i in range(len(lines)):
         l = lines[i]
         plt.plot(x, l, label=labels[i])
     plt.legend()
     if title:
         plt.title(title, loc='center')
+    if ylim:
+        plt.ylim(ylim)
     save_plot(pref)
     plt.show()
 

@@ -19,10 +19,8 @@ class Trainer:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-    def train(self, num_episodes, seed=10, pref='', save_to_file=True):
-    
-        random.seed(seed)
-        
+    def train(self, num_episodes, pref='', save_to_file=True):
+            
         # track counts of last juncture reached
         smooth = num_episodes // 100
         count_m = np.zeros((smooth, self.driver.num_junctures + 1), dtype=np.int32)
@@ -120,6 +118,9 @@ class Trainer:
             if util.checkpoint_reached(ep, 1000):
                 self.logger.debug("Ep %d ", ep)
                 
+            #if util.checkpoint_reached(ep, num_episodes // 2):
+            #    self.driver.restart_exploration()
+                
     
         self.logger.debug("Completed training in %d seconds", time.clock() - start_time)
     
@@ -173,20 +174,20 @@ class Trainer:
     def report_stats(self, pref=None):
         self.driver.report_stats(pref=pref)
         
-        util.plot([[10*x for x in self.stat_bestpath_times],
-                   self.stat_recent_total_R, self.stat_bestpath_R],
-                  self.stat_e_bp,
-                  ["Finish time by best-action path", "Recent avg total reward",
-                   "Reward for best-action path"],
-                  title="Performance over time",
-                  pref="bpt")
+#         util.plot([[x for x in self.stat_bestpath_times],
+#                    self.stat_recent_total_R, self.stat_bestpath_R],
+#                   self.stat_e_bp,
+#                   ["Finish time by best-action path", "Recent avg total reward",
+#                    "Reward for best-action path"],
+#                   title="Performance over time",
+#                   pref="bpt")
         
         # Max juncture reached
     #     for i in range(len(stat_m)):
     #         lines.append(stat_m[i])
-        S_m = np.array(self.stat_m).T
-        labels = ["ms %d" % i for i in range(len(S_m))]
-        util.plot(S_m, self.stat_e_1000, labels, "Max juncture reached", pref="ms")
+#         S_m = np.array(self.stat_m).T
+#         labels = ["ms %d" % i for i in range(len(S_m))]
+#         util.plot(S_m, self.stat_e_1000, labels, "Max juncture reached", pref="ms")
     
     def play_best(self, should_play_movie=True, pref=""):
         #logger.debug("Playing best path")

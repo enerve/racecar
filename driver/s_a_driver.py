@@ -276,7 +276,7 @@ class SADriver(Driver):
         #         util.heatmap(S_dq, (0, EPISODES, driver.num_junctures, 0),
         #                      "Diff Q per juncture over epochs", pref="DQ")
 
-        #util.plot([self.stat_dlm], self.stat_e_100, ["Avg ΔQ"], pref="delta")
+        util.plot([self.stat_dlm], self.stat_e_100, ["Avg ΔQ"], pref="delta")
 
     def _plottable(self, X, axes, pick_max=False):
         X = np.max(X, axis=axes) if pick_max else np.sum(X, axis=axes)
