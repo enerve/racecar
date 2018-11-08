@@ -15,5 +15,14 @@ class ValueFunction(object):
     def best_action(self, S):
         pass
 
-    def update(self, state, action, alpha, delta):
+    def record(self, state, action, delta):
+        pass
+
+    def update(self):
+        pass
+    
+    def collect_stats(self, ep):
+        pass
+    
+    def report_stats(self, pref):
         pass

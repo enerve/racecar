@@ -50,6 +50,7 @@ class SarsaRegressionDriver(Driver):
         # This is temporary.
         # TODO: feed in the FA object through an init variable
         self.fa = QLookup(
+                        alpha,
                         num_junctures,
                         num_lanes,
                         num_speeds,
@@ -57,8 +58,10 @@ class SarsaRegressionDriver(Driver):
                         num_steer_positions,
                         num_accel_positions)
         self.fa2 = PolynomialRegression(
-                        4e-5,  # alpha
-                        100, # regularization constant
+                        0.01, # alpha ... #4e-5 old alpha without batching
+                        0.02, # regularization constant
+                        256, # batch_size
+                        250, # max_iterations
                         num_junctures,
                         num_lanes,
                         num_speeds,
@@ -66,13 +69,7 @@ class SarsaRegressionDriver(Driver):
                         num_steer_positions,
                         num_accel_positions)
         self.avg_delta2 = 0
-        self.avg_error_cost = 0
-        self.avg_reg_cost = 0
-        self.avg_W = 0
         self.stat_dlm2 = []
-        self.stat_error_cost = []
-        self.stat_reg_cost = []
-        self.stat_W = []
 
         
         # TODO: move N to FA?
@@ -109,6 +106,9 @@ class SarsaRegressionDriver(Driver):
 
         # track average change in Q, as iterations progress
         self.stat_dlm = []
+        
+        self.actions_matched = 0
+        self.total_max_actions_picked = 0
 
     def restart_exploration(self, scale_explorate=1):
         super().restart_exploration()
@@ -135,6 +135,14 @@ class SarsaRegressionDriver(Driver):
             # Pick best
             #self.logger.debug(S)
             steer, accel = self.fa.best_action(S)
+            
+            #debugging
+#             steer2, accel2 = self.fa2.best_action(S)
+#             if steer == steer2:
+#                 self.actions_matched += 0.5
+#             if accel == accel2:
+#                 self.actions_matched += 0.5
+#             self.total_max_actions_picked += 1 
             
             #debugging
 #             if run_best:
@@ -174,55 +182,51 @@ class SarsaRegressionDriver(Driver):
 
             target = R + self.gamma * Q_at_next
             
-            delta = (target - self.fa.value(S, A))
-            self.fa.update(S, A, self.alpha, delta)
+            self.fa.record(S, A, target)
             
             # (TEMP) Also train fa2, to compare for debugging
-            delta2 = (target - self.fa2.value(S, A))
-            error_cost, reg_cost, sumW, W = self.fa2.update(S, A, delta2)
+            self.fa2.record(S, A, target)
             
             self.C[I] += 1
             self.N[S] += 1
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
             if True:# self.C[I] > 1:
+                delta = (target - self.fa.value(S, A))
                 self.avg_delta += 0.02 * (delta - self.avg_delta)
+                delta2 = (target - self.fa2.value(S, A))
                 self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
-                self.avg_error_cost += 0.02 * (error_cost - self.avg_error_cost)
-                self.avg_reg_cost += 0.2 * (reg_cost - self.avg_reg_cost)
-                self.avg_W += 0.02 * (W - self.avg_W)
 
             S, A = S_, A_
             total_R += R
             
         return total_R, environment
-
+    
     def collect_stats(self, ep, num_episodes):
         super().collect_stats(ep, num_episodes)
         
-        if True:#util.checkpoint_reached(ep, num_episodes // 100):
+        if util.checkpoint_reached(ep, num_episodes // 100):
             self.stat_e_100.append(ep)
 
             self.stat_dlm.append(self.avg_delta)
             self.stat_dlm2.append(self.avg_delta2)
-            self.stat_error_cost.append(self.avg_error_cost)
-            self.stat_reg_cost.append(self.avg_reg_cost)
-            self.stat_W.append(np.copy(self.avg_W))
+            
+            #self.logger.debug("Portion of matched actions: %0.4f",
+            #                  self.actions_matched / self.total_max_actions_picked)
+
+    def learn_from_history(self):
+        self.fa2.update()
+
+        # debugging
+        self.actions_matched = 0
+        self.total_max_actions_picked = 0
 
     def report_stats(self, pref):
         super().report_stats(pref)
+        
+        self.fa2.report_stats(pref)
 
         self.logger.debug("Final W: %s", self.fa2.W)
         util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
                   ["Avg ΔQ table", "Avg ΔQ LinReg"], pref="delta",
-                  ylim=(-100, 1000))
-#         util.plot([self.stat_error_cost, self.stat_reg_cost], self.stat_e_100,
-#                   ["Avg error cost", "Avg regularization cost"], pref="cost",
-#                   ylim=(0, 10000))
-        util.plot([self.stat_error_cost], self.stat_e_100,
-                  ["Avg error cost"], pref="cost",
-                  ylim=(0, 50000))
-        
-        sW = np.asarray(self.stat_W).T
-        labels = ["W[%d]" % x for x in range(len(sW))]
-        util.plot(sW, self.stat_e_100, labels, pref="W", ylim=(-10, 10))
+                  ylim=None)#(-100, 1000))

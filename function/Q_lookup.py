@@ -14,6 +14,7 @@ class QLookup(ValueFunction):
     '''
 
     def __init__(self,
+                 alpha,
                  num_junctures,
                  num_lanes,
                  num_speeds,
@@ -35,6 +36,9 @@ class QLookup(ValueFunction):
                            num_steer_positions,
                            num_accel_positions))
         
+        self.alpha = alpha
+        self.episode_history = []
+        
     def value(self, state, action):
         return self.Q[state + action]
 
@@ -43,5 +47,15 @@ class QLookup(ValueFunction):
         steer, accel = np.unravel_index(np.argmax(As, axis=None), As.shape)
         return steer, accel
 
-    def update(self, state, action, alpha, delta):
-        self.Q[state + action] += alpha * delta
+    def record(self, state, action, target):
+        delta = target - self.value(state, action)
+        self.episode_history.append((state + action, delta))
+        
+        # Hacky, but QLookup needs to do this at every step, not end of episode
+        self.update()
+
+    def update(self):
+        for sa, delta in self.episode_history:
+            self.Q[sa] += self.alpha * delta
+            
+        self.episode_history = []

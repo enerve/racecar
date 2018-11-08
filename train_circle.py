@@ -9,6 +9,7 @@ import logging
 from car import Car
 from track import CircleTrack
 from trainer import Trainer
+from epoch_trainer import EpochTrainer
 from driver import *
 import cmd_line
 import log
@@ -96,13 +97,13 @@ def main():
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
-    trainer = Trainer(driver, track, car)
+    trainer = EpochTrainer(driver, track, car)
     #subdir = "RC rect_qlearn_100_1.0_1.0_363312_"
     subdir = None
     if subdir:
         driver.load_model(subdir)
         trainer.load_stats(subdir)
-    trainer.train(20*1000)
+    trainer.train(8, 2000)
     trainer.report_stats()
     
     #trainer.play_best()
