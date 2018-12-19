@@ -15,6 +15,8 @@ class SADriver(Driver):
     '''
     Base class for an agent that learns to drive a car along a track, 
     optimizing using a State-Action value-function rather than State alone.
+    (Deprecated in favor of *FADriver.)
+    Uses a Q-table-lookup function approximator.
     '''
 
     def __init__(self,

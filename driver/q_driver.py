@@ -15,6 +15,8 @@ class QDriver(SADriver):
     '''
     An agent that learns to drive a car along a track, optimizing using 
     Q-learning
+    (Deprecated in favor of QFADriver.)
+    Uses a Q-table-lookup function approximator.
     '''
 
     def __init__(self, alpha, gamma, explorate,

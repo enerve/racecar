@@ -15,6 +15,8 @@ class QLambdaDriver(SADriver):
     '''
     An agent that learns to drive a car along a track, optimizing using 
     Q-lambda
+    (Deprecated in favor of QLambdaFADriver.)
+    Uses a Q-table-lookup function approximator.
     '''
 
     def __init__(self, lam, alpha, gamma, explorate,
@@ -66,14 +68,12 @@ class QLambdaDriver(SADriver):
         self.num_resets += 1
         Q_at_chosen_next = 0  # initialization doesn't matter
         
-        
         A = self._pick_action(S, run_best)
         A_ = None
         while S is not None:
-            
-            I = S + A
-
             R, S_ = environment.step(A)
+
+            I = S + A
 
             Q_at_max_next = self._max_at_state(S_)
             if S_ is not None:
@@ -81,8 +81,11 @@ class QLambdaDriver(SADriver):
                 Q_at_chosen_next = self.Q[S_ + A_]
 
             target = R + self.gamma * Q_at_max_next
-            delta = (target - self.Q[I])
+            
+            curr_value = self.Q[I]
             self.eligible_states[num_E] = I
+
+            delta = (target - curr_value)
             num_E += 1
             for i in range(num_E):
                 e_I = self.eligible_states[i]
@@ -123,7 +126,7 @@ class QLambdaDriver(SADriver):
         self.num_resets += 1
         Q_at_chosen_next = 0  # initialization doesn't matter
          
-         
+        A_ = None
         A = self.pick_action(S, run_best)
         while S is not None:
              

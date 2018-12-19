@@ -132,6 +132,7 @@ class PolynomialRegression(ValueFunction):
     def best_action(self, S):
         best_v = float("-inf")
         best_action = None
+        # TODO: Can this be vectorized instead?
         for steer in range(self.num_steer_positions):
             for accel in range(self.num_accel_positions):
                 v = self.value(S, (steer, accel))
@@ -158,7 +159,7 @@ class PolynomialRegression(ValueFunction):
         self.logger.debug("Using divisor avg_target=%s", avg_target)
         N = len(EHT)
         
-        period = max(10, self.max_iterations // 100)
+        period = max(10, self.max_iterations // 100) # for stats
 
         sum_error_cost = 0
         sum_rel_error_cost = 0
@@ -221,6 +222,7 @@ class PolynomialRegression(ValueFunction):
         pass
     
     def report_stats(self, pref):
+        self.logger.debug("Final W: %s", self.W)
         util.plot([self.stat_error_cost, self.stat_reg_cost],
                   range(len(self.stat_error_cost)),
                   ["Avg error cost", "Avg regularization cost"], pref="cost",

@@ -11,6 +11,8 @@ from track import CircleTrack
 from trainer import Trainer
 from epoch_trainer import EpochTrainer
 from driver import *
+from function import PolynomialRegression
+from function import QLookup
 import cmd_line
 import log
 import numpy as np
@@ -68,6 +70,16 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
+#     driver = QLambdaDriver(0.35, # lambda
+#                     0.7, # alpha
+#                     1, # gamma
+#                     76, # explorate
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
 #     driver = SarsaDriver(0.2, # alpha
 #                     1, # gamma
 #                     200, # explorate
@@ -87,24 +99,69 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-    driver = SarsaRegressionDriver(
-                    0.2, # alpha
-                    1, # gamma
-                    200, # explorate
+
+    fa_Q = QLookup(0.7,  # alpha
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
+#     driver = SarsaFADriver(
+#                     1, # gamma
+#                     200, # explorate
+#                     fa_Q, # guide
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+    driver = SarsaLambdaFADriver(
+                    0.35, #lambda
+                    1, # gamma
+                    76, # explorate
+                    fa_Q, # guide
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS)
+#     driver = QFADriver(
+#                     1, # gamma
+#                     200, # explorate
+#                     fa_Q, # guide
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+#     driver = QLambdaFADriver(
+#                     0.35, #lambda
+#                     1, # gamma
+#                     76, # explorate
+#                     fa_Q, # guide
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+    #trainer = Trainer(driver, track, car)
     trainer = EpochTrainer(driver, track, car)
     #subdir = "RC rect_qlearn_100_1.0_1.0_363312_"
     subdir = None
     if subdir:
         driver.load_model(subdir)
         trainer.load_stats(subdir)
+    #trainer.train(5000)
+    #trainer.train(1, 5000)
     trainer.train(8, 2000)
     trainer.report_stats()
+
+
     
     #trainer.play_best()
 #     best_env = trainer.best_environment()

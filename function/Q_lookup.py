@@ -37,7 +37,7 @@ class QLookup(ValueFunction):
                            num_accel_positions))
         
         self.alpha = alpha
-        self.episode_history = []
+        #self.episode_history = []
         
     def value(self, state, action):
         return self.Q[state + action]
@@ -49,13 +49,14 @@ class QLookup(ValueFunction):
 
     def record(self, state, action, target):
         delta = target - self.value(state, action)
-        self.episode_history.append((state + action, delta))
+        #self.episode_history.append((state + action, delta))
         
         # Hacky, but QLookup needs to do this at every step, not end of episode
-        self.update()
+        #self.update()
+        self.Q[state + action] += self.alpha * delta
 
     def update(self):
-        for sa, delta in self.episode_history:
-            self.Q[sa] += self.alpha * delta
+        #for sa, delta in self.episode_history:
+        #    self.Q[sa] += self.alpha * delta
             
-        self.episode_history = []
+        #self.episode_history = []

@@ -15,6 +15,8 @@ class SarsaDriver(SADriver):
     '''
     An agent that learns to drive a car along a track, optimizing using 
     Sarsa
+    (Deprecated in favor of SarsaFADriver.)
+    Uses a Q-table-lookup function approximator.
     '''
 
     def __init__(self, alpha, gamma, explorate,
@@ -55,10 +57,10 @@ class SarsaDriver(SADriver):
         A_ = None
         A = self._pick_action(S, run_best)
         while S is not None:
-            I = S + A
-
             R, S_ = environment.step(A)
             
+            I = S + A
+
             Q_at_next = 0
             if S_ is not None:
                 A_ = self._pick_action(S_, run_best)

@@ -1,5 +1,5 @@
 '''
-Created on Nov 3, 2018
+Created on Nov 13, 2018
 
 @author: enerve
 '''
@@ -10,17 +10,19 @@ import random
 
 from . import Driver
 from environment import Environment
-from function import PolynomialRegression
-from function import QLookup
 import util
 
-class SarsaRegressionDriver(Driver):
+class QLambdaFADriver(Driver):
     '''
-    An agent that learns to drive a car along a track, optimizing using 
-    Sarsa and a linear regression function approximator
+    An agent that learns to drive a car along a track, optimizing using Q(λ)
+    (Deprecated in favor of QLambdaFADriver.)
+    Uses a Q-table-lookup function approximator.
     '''
 
-    def __init__(self, alpha, gamma, explorate,
+    TEST_FA = True
+
+    def __init__(self, lam, gamma, explorate,
+                 fa,
                  num_junctures,
                  num_lanes,
                  num_speeds,
@@ -29,6 +31,8 @@ class SarsaRegressionDriver(Driver):
                  num_accel_positions):
         '''
         Constructor
+        fa is the value function approximator that guides the episodes and
+            learns on the job, using the Q algorithm
         '''
         super().__init__(num_junctures,
                          num_lanes,
@@ -40,37 +44,37 @@ class SarsaRegressionDriver(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        util.pre_alg = "sarsa_regression_%d_%0.1f_%0.1f" % (explorate, alpha, gamma)
+        # TODO: pre_alg.. alpha etc
+        util.pre_alg = "q_lambda_fa_driver_%d_%0.1f" % (explorate, gamma)
         self.logger.debug("Algorithm: %s", util.pre_alg)
 
+        self.lam = lam      # lookahead parameter
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
-        self.alpha = alpha  # learning rate for updating Q
 
-        # This is temporary.
-        # TODO: feed in the FA object through an init variable
-        self.fa = QLookup(
-                        alpha,
-                        num_junctures,
-                        num_lanes,
-                        num_speeds,
-                        num_directions,
-                        num_steer_positions,
-                        num_accel_positions)
-        self.fa2 = PolynomialRegression(
-                        0.01, # alpha ... #4e-5 old alpha without batching
-                        0.02, # regularization constant
-                        256, # batch_size
-                        250, # max_iterations
-                        num_junctures,
-                        num_lanes,
-                        num_speeds,
-                        num_directions,
-                        num_steer_positions,
-                        num_accel_positions)
-        self.avg_delta2 = 0
-        self.stat_dlm2 = []
+        self.fa = fa
+        
+        if self.TEST_FA:
+            # For testing the function-appromiating capabilities of any new
+            # potential FAs.
+            from function import PolynomialRegression
+            self.fa_test = PolynomialRegression(
+                            0.01, # alpha ... #4e-5 old alpha without batching
+                            0.02, # regularization constant
+                            256, # batch_size
+                            250, # max_iterations
+                            num_junctures,
+                            num_lanes,
+                            num_speeds,
+                            num_directions,
+                            num_steer_positions,
+                            num_accel_positions)        
+            self.avg_delta2 = 0
+            self.stat_dlm2 = []
 
+        self.eligible_mult = [(lam * gamma) ** i for i in range(num_junctures)]
+        self.eligible_states = [None for i in range(num_junctures)]
+        self.eligible_state_target = [0 for i in range(num_junctures)]
         
         # TODO: move N to FA?
         # N is the count of visits to state
@@ -91,6 +95,9 @@ class SarsaRegressionDriver(Driver):
         self.avg_delta = 0
         self.restarted = False
 
+
+        # Stats
+        
         self.stat_e_100 = []
         self.stat_qm = []
         self.stat_cm = []
@@ -99,6 +106,7 @@ class SarsaRegressionDriver(Driver):
         self.stat_debug_qv = []
         self.stat_debug_n = []
 
+        # TODO: Move to QLookup
         self.stat_e_200 = []
         self.q_plotter = util.Plotter("Q value at junctures along lanes")
         self.qx_plotter = util.Plotter("Max Q value at junctures along lanes")
@@ -109,6 +117,9 @@ class SarsaRegressionDriver(Driver):
         
         self.actions_matched = 0
         self.total_max_actions_picked = 0
+
+        self.num_resets = 0
+        self.num_steps = 0
 
     def restart_exploration(self, scale_explorate=1):
         super().restart_exploration()
@@ -137,7 +148,7 @@ class SarsaRegressionDriver(Driver):
             steer, accel = self.fa.best_action(S)
             
             #debugging
-#             steer2, accel2 = self.fa2.best_action(S)
+#             steer2, accel2 = self.fa_test.best_action(S)
 #             if steer == steer2:
 #                 self.actions_matched += 0.5
 #             if accel == accel2:
@@ -167,41 +178,84 @@ class SarsaRegressionDriver(Driver):
                                   should_record=run_best)
         S = environment.state_encoding()
         total_R = 0
+        steps_history = []
         
-        A_ = None
+        # Eligibility
+        num_E = 0
+        self.num_resets += 1
+        Q_at_chosen_next = 0  # initialization doesn't matter
+        
         A = self._pick_action(S, run_best)
+        A_ = None
         while S is not None:
-            I = S + A
-
             R, S_ = environment.step(A)
             
-            Q_at_next = 0
+            steps_history.append((S, A, R, S_))
+            I = S + A
+            
+            Q_at_max_next = 0
             if S_ is not None:
+                # off-policy
+                max_A = self.fa.best_action(S_)
+                Q_at_max_next = self.fa.value(S_, max_A)
+                # on-policy
                 A_ = self._pick_action(S_, run_best)
-                Q_at_next = self.fa.value(S_, A_)
+                Q_at_chosen_next = self.fa.value(S_, A_)
 
-            target = R + self.gamma * Q_at_next
+            target = R + self.gamma * Q_at_max_next
             
-            self.fa.record(S, A, target)
-            
-            # (TEMP) Also train fa2, to compare for debugging
-            self.fa2.record(S, A, target)
-            
+            curr_value = self.fa.value(S, A)  #TODO: =previous Q_at_chosen_next
+            self.eligible_states[num_E] = (S, A)
+            self.eligible_state_target[num_E] = curr_value
+
+            delta = (target - curr_value)
+            num_E += 1
+            for i in range(num_E):
+                self.eligible_state_target[i] += delta * self.eligible_mult[num_E-i-1]
             self.C[I] += 1
             self.N[S] += 1
+            
+            if Q_at_chosen_next != Q_at_max_next:
+                # The policy diverted from Q* policy so restart eligibilities
+                # But first, flush the eligibility updates into the FA
+                self._record_eligibles(num_E)
+                num_E = 0
+            
+            self.num_steps += 1
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
             if True:# self.C[I] > 1:
                 delta = (target - self.fa.value(S, A))
                 self.avg_delta += 0.02 * (delta - self.avg_delta)
-                delta2 = (target - self.fa2.value(S, A))
-                self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
-
+                if self.TEST_FA:
+                    delta2 = (target - self.fa_test.value(S, A))
+                    self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
+            
             S, A = S_, A_
             total_R += R
-            
-        return total_R, environment
+
+        self._record_eligibles(num_E)
+
+        return total_R, environment, steps_history
     
+    def _record_eligibles(self, num_E):
+        for i in range(num_E):
+            S, A = self.eligible_states[i]
+            target = self.eligible_state_target[i]
+            self.fa.record(S, A, target)
+            if self.TEST_FA:
+                self.fa_test.record(S, A, target)
+        self.num_resets += 1
+    
+    def update_fa(self):
+        self.fa.update()
+        if self.TEST_FA:
+            self.fa_test.update()
+
+        # debugging
+        self.actions_matched = 0
+        self.total_max_actions_picked = 0
+
     def collect_stats(self, ep, num_episodes):
         super().collect_stats(ep, num_episodes)
         
@@ -209,24 +263,23 @@ class SarsaRegressionDriver(Driver):
             self.stat_e_100.append(ep)
 
             self.stat_dlm.append(self.avg_delta)
-            self.stat_dlm2.append(self.avg_delta2)
+            if self.TEST_FA:
+                self.stat_dlm2.append(self.avg_delta2)
             
             #self.logger.debug("Portion of matched actions: %0.4f",
             #                  self.actions_matched / self.total_max_actions_picked)
 
-    def learn_from_history(self):
-        self.fa2.update()
-
-        # debugging
-        self.actions_matched = 0
-        self.total_max_actions_picked = 0
-
     def report_stats(self, pref):
         super().report_stats(pref)
-        
-        self.fa2.report_stats(pref)
+        util.plot([self.stat_dlm], self.stat_e_100,
+                  ["Avg ΔQ fa"], pref="delta",
+                  ylim=None)
 
-        self.logger.debug("Final W: %s", self.fa2.W)
-        util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
-                  ["Avg ΔQ table", "Avg ΔQ LinReg"], pref="delta",
-                  ylim=None)#(-100, 1000))
+        if self.TEST_FA:
+            self.fa_test.report_stats(pref)
+            util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
+                      ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref="delta",
+                      ylim=None)
+
+        self.logger.debug("Average length of eligibility trace: %0.2f", 
+                          self.num_steps / self.num_resets)

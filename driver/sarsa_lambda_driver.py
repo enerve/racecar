@@ -15,6 +15,8 @@ class SarsaLambdaDriver(SADriver):
     '''
     An agent that learns to drive a car along a track, optimizing using 
     Sarsa-lambda
+    (Deprecated in favor of SarsaLambdaFADriver.)
+    Uses a Q-table-lookup function approximator.
     '''
 
     def __init__(self, lam, alpha, gamma, explorate,

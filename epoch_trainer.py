@@ -53,9 +53,13 @@ class EpochTrainer:
             # In each epoch, we first collect experience, then (re)train FA
             self.logger.debug("====== Epoch %d =====", epoch)
             
+            history = [] # history of steps in episodes, each containing
+                         # state, action, reward and next state
+            
             for ep_ in range(num_episodes_per_epoch):
-                ep += 1
-                total_R, environment = self.driver.run_episode(self.track, self.car)
+                total_R, environment, ep_hist = self.driver.run_episode(
+                    self.track, self.car)
+                history.extend(ep_hist)
         
                 count_m[ep % smooth] = Eye[environment.curr_juncture]
                 
@@ -69,6 +73,7 @@ class EpochTrainer:
                         best_ep = ep
                         best_finished = environment.has_reached_finish()
                         
+                # TODO: fix
                 self.driver.collect_stats(ep, total_episodes)
                         
         
@@ -84,7 +89,7 @@ class EpochTrainer:
                 len_bp_split = (total_episodes // 100)
                 recent_total_R += (total_R - recent_total_R) * 10 / len_bp_split
                 if ep > 0 and ep % len_bp_split == len_bp_split - 1:
-                    bestpath_R, bestpath_env = self.driver.run_episode(self.track, 
+                    bestpath_R, bestpath_env, _ = self.driver.run_episode(self.track, 
                                                                        self.car, 
                                                                        run_best=True)
                     self.stat_bestpath_times.append(bestpath_env.total_time_taken() 
@@ -99,9 +104,14 @@ class EpochTrainer:
                 if util.checkpoint_reached(ep, 1000):
                     self.logger.debug("Ep %d ", ep)
                     
+                ep += 1
             
             
-            self.driver.learn_from_history()
+            self.driver.update_fa()
+            
+#             if self.student_driver:
+#                 self.student_driver.observe_history(history)
+#                 self.student_driver.update_fa()
             
             #    self.driver.restart_exploration()
                     
