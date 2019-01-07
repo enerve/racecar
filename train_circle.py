@@ -61,45 +61,7 @@ def main():
     random.seed(seed)
     np.random.seed(seed)
 
-#     driver = QDriver(1, # alpha
-#                     1, # gamma
-#                     20, # explorate
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#     driver = QLambdaDriver(0.35, # lambda
-#                     0.7, # alpha
-#                     1, # gamma
-#                     76, # explorate
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#     driver = SarsaDriver(0.2, # alpha
-#                     1, # gamma
-#                     200, # explorate
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#     driver = SarsaLambdaDriver(0.9, # lambda
-#                     0.2, # alpha
-#                     1, # gamma
-#                     200, # explorate
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-
+    # ------------------ Guide driver --------------------
     fa_Q = QLookup(0.7,  # alpha
                     NUM_JUNCTURES,
                     NUM_LANES,
@@ -110,7 +72,7 @@ def main():
 #     driver = SarsaFADriver(
 #                     1, # gamma
 #                     200, # explorate
-#                     fa_Q, # guide
+#                     fa_Q,
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
@@ -121,7 +83,7 @@ def main():
                     0.35, #lambda
                     1, # gamma
                     76, # explorate
-                    fa_Q, # guide
+                    fa_Q,
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
@@ -131,7 +93,7 @@ def main():
 #     driver = QFADriver(
 #                     1, # gamma
 #                     200, # explorate
-#                     fa_Q, # guide
+#                     fa_Q,
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
@@ -142,15 +104,55 @@ def main():
 #                     0.35, #lambda
 #                     1, # gamma
 #                     76, # explorate
-#                     fa_Q, # guide
+#                     fa_Q,
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
+
+    # ------------------ Student driver --------------------
+    fa_Q_S = QLookup(0.7,  # alpha
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS)
+#     fa_Poly_S =  PolynomialRegression(
+#                     0.01, # alpha ... #4e-5 old alpha without batching
+#                     0.02, # regularization constant
+#                     256, # batch_size
+#                     250, # max_iterations
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)        
+#     student = QFAStudent(
+#                     1, # gamma
+#                     fa_Q_S,
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+    student = QLambdaFAStudent(
+                    0.35, #lambda
+                    1, # gamma
+                    fa_Q_S,
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS)
+
     #trainer = Trainer(driver, track, car)
-    trainer = EpochTrainer(driver, track, car)
+    trainer = EpochTrainer(driver, track, car, student)
     #subdir = "RC rect_qlearn_100_1.0_1.0_363312_"
     subdir = None
     if subdir:

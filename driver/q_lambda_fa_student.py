@@ -1,5 +1,5 @@
 '''
-Created on Nov 3, 2018
+Created on Jan 7, 2019
 
 @author: enerve
 '''
@@ -10,13 +10,13 @@ import numpy as np
 from . import Driver
 import util
 
-class SarsaFAStudent(Driver):
+class QLambdaFAStudent(Driver):
     '''
-    An agent that learns to drive a car along a track, by observing historical
-    episodes and using Sarsa algorithm.
+    An agent that learns to drive a car along a track by observing episodes,
+    and optimizing using Q(λ)
     '''
 
-    def __init__(self, gamma,
+    def __init__(self, lam, gamma,
                  fa,
                  num_junctures,
                  num_lanes,
@@ -39,11 +39,16 @@ class SarsaFAStudent(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        # TODO: pre_alg.. alpha etc .. and take it out of this class
-        util.pre_alg = "sarsa_fa_student_%0.1f" % (gamma)
+        # TODO: pre_alg.. alpha etc
+        util.pre_alg = "q_lambda_fa_student_%0.1f" % (gamma)
         self.logger.debug("Algorithm: %s", util.pre_alg)
 
+        self.lam = lam      # lookahead parameter
         self.gamma = gamma  # weight given to predicted future
+        
+        self.eligible_mult = [(lam * gamma) ** i for i in range(num_junctures)]
+        self.eligible_states = [None for i in range(num_junctures)]
+        self.eligible_state_target = [0 for i in range(num_junctures)]
         
         # TODO: move N to FA?
         # N is the count of visits to state
@@ -62,8 +67,9 @@ class SarsaFAStudent(Driver):
         # Rs is the average reward at juncture (for statistics)
         self.Rs = np.zeros((num_junctures), dtype=np.float)
         self.avg_delta = 0
-        self.restarted = False
 
+        # Stats
+        
         self.stat_e_100 = []
         self.stat_qm = []
         self.stat_cm = []
@@ -81,43 +87,69 @@ class SarsaFAStudent(Driver):
         # track average change in Q, as iterations progress
         self.stat_dlm = []
 
-
     def observe_episode(self, steps_history):
         ''' Collects training data based on given episode data. 
             steps_history: list of steps, each a tuples (of S, A, R),
                 in chronological order
         '''
+
+        # Eligibility
+        num_E = 0
+        Q_at_chosen_next = 0  # initialization doesn't matter
         
         S, A, R = steps_history[0]
-        i = 0
+        hi = 0
         while S is not None:
-            i += 1
-            S_, A_, R_ = steps_history[i]
-        
+            hi += 1
+            S_, A_, R_ = steps_history[hi]
+            
             I = S + A
-
-            Q_at_next = 0
+            
+            Q_at_max_next = 0
             if S_ is not None:
-                # Find value for the next action / state taken
-                Q_at_next = self.fa.value(S_, A_)
+                # off-policy
+                max_A = self.fa.best_action(S_)
+                Q_at_max_next = self.fa.value(S_, max_A)
+                # on-policy
+                Q_at_chosen_next = self.fa.value(S_, A_)
 
-            target = R + self.gamma * Q_at_next
+            target = R + self.gamma * Q_at_max_next
             
-            self.fa.record(S, A, target)
+            curr_value = self.fa.value(S, A)  #TODO: =previous Q_at_chosen_next
+            self.eligible_states[num_E] = (S, A)
+            self.eligible_state_target[num_E] = curr_value
+
+            delta = (target - curr_value)
+            num_E += 1
+            for i in range(num_E):
+                self.eligible_state_target[i] += delta * self.eligible_mult[num_E-i-1]
+            self.C[I] += 1
+            self.N[S] += 1
             
-            # stats
+            if Q_at_chosen_next != Q_at_max_next:
+                # The policy diverted from Q* policy so restart eligibilities
+                # But first, flush the eligibility updates into the FA
+                self._record_eligibles(num_E)
+                num_E = 0
+            
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
             delta = (target - self.fa.value(S, A))
             self.avg_delta += 0.02 * (delta - self.avg_delta)
-
-            S, A, R = S_, A_, R_
             
-        return
-                
+            S, A, R = S_, A_, R_
+
+        self._record_eligibles(num_E)
+    
+    def _record_eligibles(self, num_E):
+        for i in range(num_E):
+            S, A = self.eligible_states[i]
+            target = self.eligible_state_target[i]
+            self.fa.record(S, A, target)
+    
     def update_fa(self):
         self.fa.update()
-    
+
     def collect_stats(self, ep, num_episodes):
         super().collect_stats(ep, num_episodes)
         
@@ -128,7 +160,6 @@ class SarsaFAStudent(Driver):
 
     def report_stats(self, pref):
         super().report_stats(pref)
-        
         util.plot([self.stat_dlm], self.stat_e_100,
-                  ["Avg ΔQ student"], pref=pref+"delta",
+                  ["Avg ΔQ student fa"], pref=pref+"delta",
                   ylim=None)

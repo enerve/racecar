@@ -17,7 +17,7 @@ class SarsaLambdaFADriver(Driver):
     An agent that learns to drive a car along a track, optimizing using Sarsa(λ)
     '''
 
-    TEST_FA = True
+    TEST_FA = False
 
     def __init__(self, lam, gamma, explorate,
                  fa,
@@ -32,7 +32,8 @@ class SarsaLambdaFADriver(Driver):
         fa is the value function approximator that guides the episodes and
             learns on the job, using the Q algorithm
         '''
-        super().__init__(num_junctures,
+        super().__init__(fa,
+                         num_junctures,
                          num_lanes,
                          num_speeds,
                          num_directions,
@@ -43,7 +44,7 @@ class SarsaLambdaFADriver(Driver):
         self.logger.setLevel(logging.DEBUG)
     
         # TODO: pre_alg.. alpha etc
-        util.pre_alg = "q_lambda_fa_driver_%d_%0.1f" % (explorate, gamma)
+        util.pre_alg = "sarsa_lambda_fa_driver_%d_%0.1f" % (explorate, gamma)
         self.logger.debug("Algorithm: %s", util.pre_alg)
 
         self.lam = lam      # lookahead parameter
@@ -132,13 +133,10 @@ class SarsaLambdaFADriver(Driver):
         self.avg_delta = 0
         self.restarted = True
 
-    def _pick_action(self, S, run_best):
-        if run_best:
-            epsilon = 0
-        else:
-            n = self.N[S]
-            N0 = self.explorate
-            epsilon = N0 / (N0 + n)
+    def _pick_action(self, S):
+        n = self.N[S]
+        N0 = self.explorate
+        epsilon = N0 / (N0 + n)
       
         if random.random() >= epsilon:
             # Pick best
@@ -169,30 +167,29 @@ class SarsaLambdaFADriver(Driver):
         return (steer, accel)
     
 
-    def run_episode(self, track, car, run_best=False):
+    def run_episode(self, track, car):
         environment = Environment(track,
                                   car,
-                                  self.num_junctures,
-                                  should_record=run_best)
-        S = environment.state_encoding()
+                                  self.num_junctures)
         total_R = 0
         steps_history = []
         
         # Eligibility
         num_E = 0
         
-        A = self._pick_action(S, run_best)
+        S = environment.state_encoding()
+        A = self._pick_action(S)
         A_ = None
         curr_value = self.fa.value(S, A)
         while S is not None:
             R, S_ = environment.step(A)
             
-            steps_history.append((S, A, R, S_))
+            steps_history.append((S, A, R))
             I = S + A
             
             Q_at_next = 0
             if S_ is not None:
-                A_ = self._pick_action(S_, run_best)
+                A_ = self._pick_action(S_)
                 Q_at_next = self.fa.value(S_, A_)
 
             target = R + self.gamma * Q_at_next
@@ -204,24 +201,26 @@ class SarsaLambdaFADriver(Driver):
             delta = (target - curr_value)
             num_E += 1
             for i in range(num_E):
-                self.eligible_state_target[i] += delta * self.eligible_mult[num_E-i-1]
+                self.eligible_state_target[i] += delta * self.eligible_mult[
+                    num_E-i-1]
             self.C[I] += 1
             self.N[S] += 1
             
             self.num_steps += 1
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
-            if True:# self.C[I] > 1:
-                delta = (target - self.fa.value(S, A))
-                self.avg_delta += 0.02 * (delta - self.avg_delta)
-                if self.TEST_FA:
-                    delta2 = (target - self.fa_test.value(S, A))
-                    self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
+            delta = (target - self.fa.value(S, A))
+            self.avg_delta += 0.02 * (delta - self.avg_delta)
+            if self.TEST_FA:
+                delta2 = (target - self.fa_test.value(S, A))
+                self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
             
             S, A, curr_value = S_, A_, Q_at_next
             total_R += R
 
         self._record_eligibles(num_E)
+        
+        steps_history.append((None, None, None))
 
         return total_R, environment, steps_history
     
@@ -259,13 +258,13 @@ class SarsaLambdaFADriver(Driver):
     def report_stats(self, pref):
         super().report_stats(pref)
         util.plot([self.stat_dlm], self.stat_e_100,
-                  ["Avg ΔQ fa"], pref="delta",
+                  ["Avg ΔQ fa"], pref=pref+"delta",
                   ylim=None)
 
         if self.TEST_FA:
             self.fa_test.report_stats(pref)
             util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
-                      ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref="delta",
+                      ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref=pref+"delta",
                       ylim=None)
 
         self.logger.debug("Average length of eligibility trace: %0.2f", 

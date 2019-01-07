@@ -17,7 +17,7 @@ class QFADriver(Driver):
     An agent that learns to drive a car along a track, optimizing using Q alg
     '''
     
-    TEST_FA = True
+    TEST_FA = False
 
     def __init__(self, gamma, explorate,
                  fa,
@@ -32,7 +32,8 @@ class QFADriver(Driver):
         fa is the value function approximator that gides the episodes and
             leans on the job, using the Q algorithm
         '''
-        super().__init__(num_junctures,
+        super().__init__(fa,
+                         num_junctures,
                          num_lanes,
                          num_speeds,
                          num_directions,
@@ -48,8 +49,6 @@ class QFADriver(Driver):
 
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
-
-        self.fa = fa
         
         if self.TEST_FA:
             # For testing the function-appromiating capabilities of any new
@@ -122,13 +121,10 @@ class QFADriver(Driver):
         self.avg_delta = 0
         self.restarted = True
 
-    def _pick_action(self, S, run_best):
-        if run_best:
-            epsilon = 0
-        else:
-            n = self.N[S]
-            N0 = self.explorate
-            epsilon = N0 / (N0 + n)
+    def _pick_action(self, S):
+        n = self.N[S]
+        N0 = self.explorate
+        epsilon = N0 / (N0 + n)
       
         if random.random() >= epsilon:
             # Pick best
@@ -158,22 +154,20 @@ class QFADriver(Driver):
         
         return (steer, accel)
     
-
-    def run_episode(self, track, car, run_best=False):
+    def run_episode(self, track, car):
         environment = Environment(track,
                                   car,
-                                  self.num_junctures,
-                                  should_record=run_best)
-        S = environment.state_encoding()
+                                  self.num_junctures)
         total_R = 0
         steps_history = []
         
+        S = environment.state_encoding()
         A_ = None
-        A = self._pick_action(S, run_best)
+        A = self._pick_action(S)
         while S is not None:
             R, S_ = environment.step(A)
             
-            steps_history.append((S, A, R, S_))
+            steps_history.append((S, A, R))
             I = S + A
             
             Q_at_max_next = 0
@@ -182,7 +176,7 @@ class QFADriver(Driver):
                 max_A = self.fa.best_action(S_)
                 Q_at_max_next = self.fa.value(S_, max_A)
                 # on-policy
-                A_ = self._pick_action(S_, run_best)
+                A_ = self._pick_action(S_)
 
             target = R + self.gamma * Q_at_max_next
             
@@ -195,16 +189,17 @@ class QFADriver(Driver):
             self.N[S] += 1
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
-            if True:# self.C[I] > 1:
-                delta = (target - self.fa.value(S, A))
-                self.avg_delta += 0.02 * (delta - self.avg_delta)
-                if self.TEST_FA:
-                    delta2 = (target - self.fa_test.value(S, A))
-                    self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
+            delta = (target - self.fa.value(S, A))
+            self.avg_delta += 0.02 * (delta - self.avg_delta)
+            if self.TEST_FA:
+                delta2 = (target - self.fa_test.value(S, A))
+                self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
             
             S, A = S_, A_
             total_R += R
             
+        steps_history.append((None, None, None))
+
         return total_R, environment, steps_history
     
     def collect_stats(self, ep, num_episodes):
@@ -232,12 +227,12 @@ class QFADriver(Driver):
     def report_stats(self, pref):
         super().report_stats(pref)
         
-        util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
-                  ["Avg ΔQ table", "Avg ΔQ LinReg"], pref="delta",
+        util.plot([self.stat_dlm], self.stat_e_100,
+                  ["Avg ΔQ table"], pref=pref+"delta",
                   ylim=None)#(-100, 1000))
 
         if self.TEST_FA:
             self.fa_test.report_stats(pref)
             util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
-                      ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref="delta",
+                      ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref=pref+"delta",
                       ylim=None)

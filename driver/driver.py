@@ -13,11 +13,11 @@ import util
 
 class Driver(object):
     '''
-    An agent that learns to drive a car along a track, optimizing using 
-    Q-learning
+    An agent that drives a car along a track
     '''
 
     def __init__(self,
+                 fa,
                  num_junctures,
                  num_lanes,
                  num_speeds,
@@ -32,6 +32,8 @@ class Driver(object):
     
         util.pre_alg = "driverbase"
         
+        self.fa = fa
+
         self.num_junctures = num_junctures
         self.num_lanes = num_lanes
         self.num_speeds = num_speeds
@@ -53,7 +55,36 @@ class Driver(object):
     def restart_exploration(self):
         pass
     
-    def run_episode(self, track, car, run_best=False):
+    def run_best_episode(self, track, car):
+        ''' Runs an episode picking the best actions based on the driver's
+            function approximator
+        '''
+        environment = Environment(track,
+                                  car,
+                                  self.num_junctures,
+                                  should_record=True)
+        total_R = 0
+        steps_history = []
+        
+        S = environment.state_encoding()
+        A = self.fa.best_action(S)
+        A_ = None
+        while S is not None:
+            R, S_ = environment.step(A)
+
+            steps_history.append((S, A, R))
+            
+            if S_ is not None:
+                A_ = self.fa.best_action(S_)
+
+            S, A = S_, A_
+            total_R += R
+            
+        steps_history.append((None, None, None))
+            
+        return total_R, environment, steps_history
+    
+    def run_episode(self, track, car):
         pass
     
     def collect_stats(self, ep, num_episodes):

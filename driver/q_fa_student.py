@@ -1,5 +1,5 @@
 '''
-Created on Nov 3, 2018
+Created on Jan 5, 2019
 
 @author: enerve
 '''
@@ -10,12 +10,11 @@ import numpy as np
 from . import Driver
 import util
 
-class SarsaFAStudent(Driver):
+class QFAStudent(Driver):
     '''
-    An agent that learns to drive a car along a track, by observing historical
-    episodes and using Sarsa algorithm.
+    An agent that learns to drive a car along a track, optimizing using Q alg
     '''
-
+    
     def __init__(self, gamma,
                  fa,
                  num_junctures,
@@ -39,8 +38,8 @@ class SarsaFAStudent(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        # TODO: pre_alg.. alpha etc .. and take it out of this class
-        util.pre_alg = "sarsa_fa_student_%0.1f" % (gamma)
+        # TODO: pre_alg.. alpha etc
+        util.pre_alg = "q_fa_student_%0.1f" % (gamma)
         self.logger.debug("Algorithm: %s", util.pre_alg)
 
         self.gamma = gamma  # weight given to predicted future
@@ -81,43 +80,41 @@ class SarsaFAStudent(Driver):
         # track average change in Q, as iterations progress
         self.stat_dlm = []
 
-
     def observe_episode(self, steps_history):
         ''' Collects training data based on given episode data. 
             steps_history: list of steps, each a tuples (of S, A, R),
                 in chronological order
         '''
-        
         S, A, R = steps_history[0]
         i = 0
         while S is not None:
             i += 1
             S_, A_, R_ = steps_history[i]
-        
+
             I = S + A
-
-            Q_at_next = 0
+            
+            Q_at_max_next = 0
             if S_ is not None:
-                # Find value for the next action / state taken
-                Q_at_next = self.fa.value(S_, A_)
+                # Off policy (i.e. ignoring A_)
+                max_A = self.fa.best_action(S_)
+                Q_at_max_next = self.fa.value(S_, max_A)
 
-            target = R + self.gamma * Q_at_next
+            target = R + self.gamma * Q_at_max_next
             
             self.fa.record(S, A, target)
             
-            # stats
+            self.C[I] += 1
+            self.N[S] += 1
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
             delta = (target - self.fa.value(S, A))
             self.avg_delta += 0.02 * (delta - self.avg_delta)
-
-            S, A, R = S_, A_, R_
             
-        return
-                
+            S, A, R = S_, A_, R_
+    
     def update_fa(self):
         self.fa.update()
-    
+
     def collect_stats(self, ep, num_episodes):
         super().collect_stats(ep, num_episodes)
         
@@ -130,5 +127,5 @@ class SarsaFAStudent(Driver):
         super().report_stats(pref)
         
         util.plot([self.stat_dlm], self.stat_e_100,
-                  ["Avg ΔQ student"], pref=pref+"delta",
-                  ylim=None)
+                  ["Avg ΔQ student table"], pref=pref+"delta",
+                  ylim=None)#(-100, 1000))

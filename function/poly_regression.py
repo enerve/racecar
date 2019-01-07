@@ -50,8 +50,8 @@ class PolynomialRegression(ValueFunction):
         self.num_steer_positions = num_steer_positions
         self.num_accel_positions = num_accel_positions
         
-        self.episode_history_x = []
-        self.episode_history_target = []
+        self.steps_history_x = []
+        self.steps_history_target = []
                 
         self.num_inputs = 6 + 1
         
@@ -145,19 +145,19 @@ class PolynomialRegression(ValueFunction):
     def record(self, state, action, target):
         x = self._x_adjust(state, action)
 
-        self.episode_history_x.append(x)
-        self.episode_history_target.append(target)
+        self.steps_history_x.append(x)
+        self.steps_history_target.append(target)
 
     def update(self):
         ''' Updates the value function model based on data collected since
             the last update '''
 
-        EHX = np.asarray(self.episode_history_x)
-        EHT = np.asarray(self.episode_history_target)
+        SHX = np.asarray(self.steps_history_x)
+        SHT = np.asarray(self.steps_history_target)
         
-        avg_target = np.mean(np.abs(EHT))
+        avg_target = np.mean(np.abs(SHT))
         self.logger.debug("Using divisor avg_target=%s", avg_target)
-        N = len(EHT)
+        N = len(SHT)
         
         period = max(10, self.max_iterations // 100) # for stats
 
@@ -171,12 +171,12 @@ class PolynomialRegression(ValueFunction):
         for i in range(self.max_iterations):
             if self.batch_size == 0:
                 # Do full-batch
-                X = EHX   # N x d
-                Y = EHT   # N
+                X = SHX   # N x d
+                Y = SHT   # N
             else:
                 ids = np.random.choice(N, size=self.batch_size)
-                X = EHX[ids]   # b x d
-                Y = EHT[ids]   # b
+                X = SHX[ids]   # b x d
+                Y = SHT[ids]   # b
             V = self._value(X) # b
             D = V - Y # b
             
@@ -210,9 +210,9 @@ class PolynomialRegression(ValueFunction):
                 sum_reg_cost = 0
                 sum_W = 0
 
-        # Forget old episode history
-        self.episode_history_x = []
-        self.episode_history_target = []
+        # Forget old steps history
+        self.steps_history_x = []
+        self.steps_history_target = []
         
         debug_diff_W = (debug_start_W - self.W)
         self.logger.debug(" W changed by %f, i.e.\n%s", 

@@ -14,8 +14,9 @@ class EpochTrainer:
         history for an epoch and then training on that data.
     '''
 
-    def __init__(self, driver, track, car):
+    def __init__(self, driver, track, car, student=None):
         self.driver = driver
+        self.student = student
         self.track = track
         self.car = car
         self.logger = logging.getLogger(__name__)
@@ -48,18 +49,18 @@ class EpochTrainer:
         best_finished = False
         recent_total_R = 0
 
-        ep = 0
+        ep = ep_s = 0
         for epoch in range(num_epochs):
             # In each epoch, we first collect experience, then (re)train FA
             self.logger.debug("====== Epoch %d =====", epoch)
             
-            history = [] # history of steps in episodes, each containing
-                         # state, action, reward and next state
+            history = [] # history of episodes, each episode a list of tuples of
+                         # state, action, reward
             
             for ep_ in range(num_episodes_per_epoch):
-                total_R, environment, ep_hist = self.driver.run_episode(
+                total_R, environment, ep_steps = self.driver.run_episode(
                     self.track, self.car)
-                history.extend(ep_hist)
+                history.append(ep_steps)
         
                 count_m[ep % smooth] = Eye[environment.curr_juncture]
                 
@@ -89,9 +90,8 @@ class EpochTrainer:
                 len_bp_split = (total_episodes // 100)
                 recent_total_R += (total_R - recent_total_R) * 10 / len_bp_split
                 if ep > 0 and ep % len_bp_split == len_bp_split - 1:
-                    bestpath_R, bestpath_env, _ = self.driver.run_episode(self.track, 
-                                                                       self.car, 
-                                                                       run_best=True)
+                    bestpath_R, bestpath_env, _ = self.driver.run_best_episode(
+                        self.track, self.car)
                     self.stat_bestpath_times.append(bestpath_env.total_time_taken() 
                                                if bestpath_env.has_reached_finish() 
                                                else 500)
@@ -109,11 +109,14 @@ class EpochTrainer:
             
             self.driver.update_fa()
             
-#             if self.student_driver:
-#                 self.student_driver.observe_history(history)
-#                 self.student_driver.update_fa()
+            if self.student:
+                # Train the student driver with the history of episodes
+                for ep_steps in history:
+                    self.student.observe_episode(ep_steps)
+                    self.student.collect_stats(ep_s, total_episodes)
+                    ep_s += 1
+                self.student.update_fa()
             
-            #    self.driver.restart_exploration()
                     
     
         self.logger.debug("Completed training in %d seconds", time.clock() - start_time)
@@ -165,9 +168,11 @@ class EpochTrainer:
         C = util.load("statsC", subdir, pref)
         self.stat_e_1000 = C
     
-    def report_stats(self, pref=None):
-        self.driver.report_stats(pref=pref)
+    def report_stats(self, pref=""):
+        self.driver.report_stats(pref="g_" + pref)
         
+        if self.student:
+            self.student.report_stats(pref="s_" + pref)
 #         util.plot([[x for x in self.stat_bestpath_times],
 #                    self.stat_recent_total_R, self.stat_bestpath_R],
 #                   self.stat_e_bp,
@@ -198,6 +203,5 @@ class EpochTrainer:
         return environment
     
     def best_environment(self):
-        total_R, environment = self.driver.run_episode(self.track, self.car, 
-                                                       run_best=True)
+        total_R, environment, _ = self.driver.run_best_episode(self.track, self.car)
         return environment
