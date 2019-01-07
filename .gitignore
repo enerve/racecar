@@ -3,3 +3,5 @@
 /a
 /b
 /oodesign.rtf
+__pycache__/
+*.py[cod]
