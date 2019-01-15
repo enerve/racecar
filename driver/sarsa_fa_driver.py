@@ -228,6 +228,8 @@ class SarsaFADriver(Driver):
         util.plot([self.stat_dlm], self.stat_e_100,
                   ["Avg ΔQ"], pref=pref+"delta",
                   ylim=None)
+        self.fa.report_stats(pref)
+
 #         util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
 #                   ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref="delta",
 #                   ylim=None)

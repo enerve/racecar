@@ -267,6 +267,7 @@ class QLambdaFADriver(Driver):
         util.plot([self.stat_dlm], self.stat_e_100,
                   ["Avg ΔQ fa"], pref=pref+"delta",
                   ylim=None)
+        self.fa.report_stats(pref)
 
         if self.TEST_FA:
             self.fa_test.report_stats(pref)

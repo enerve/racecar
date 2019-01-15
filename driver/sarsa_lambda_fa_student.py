@@ -161,4 +161,5 @@ class SarsaLambdaFAStudent(Driver):
         util.plot([self.stat_dlm], self.stat_e_100,
                   ["Avg ΔQ student fa"], pref=pref+"delta",
                   ylim=None)
+        self.fa.report_stats(pref)
 
