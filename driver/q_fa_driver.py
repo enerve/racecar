@@ -17,8 +17,6 @@ class QFADriver(Driver):
     An agent that learns to drive a car along a track, optimizing using Q alg
     '''
     
-    TEST_FA = False
-
     def __init__(self, gamma, explorate,
                  fa,
                  num_junctures,
@@ -26,11 +24,12 @@ class QFADriver(Driver):
                  num_speeds,
                  num_directions,
                  num_steer_positions,
-                 num_accel_positions):
+                 num_accel_positions,
+                 mimic_fa):
         '''
         Constructor
-        fa is the value function approximator that gides the episodes and
-            leans on the job, using the Q algorithm
+        fa is the value function approximator that guides the episodes and
+            learns on the job, using the Q algorithm
         '''
         super().__init__(fa,
                          num_junctures,
@@ -38,7 +37,8 @@ class QFADriver(Driver):
                          num_speeds,
                          num_directions,
                          num_steer_positions,
-                         num_accel_positions)
+                         num_accel_positions,
+                         mimic_fa)
         
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -46,21 +46,7 @@ class QFADriver(Driver):
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
         
-        if self.TEST_FA:
-            # For testing the function-appromiating capabilities of any new
-            # potential FAs.
-            from function import PolynomialRegression
-            self.fa_test = PolynomialRegression(
-                            0.01, # alpha ... #4e-5 old alpha without batching
-                            0.02, # regularization constant
-                            256, # batch_size
-                            250, # max_iterations
-                            num_junctures,
-                            num_lanes,
-                            num_speeds,
-                            num_directions,
-                            num_steer_positions,
-                            num_accel_positions)        
+        if self.mimic_fa:
             self.avg_delta2 = 0
             self.stat_dlm2 = []
 
@@ -83,6 +69,9 @@ class QFADriver(Driver):
         self.avg_delta = 0
         self.restarted = False
 
+
+        # Stats
+        
         self.stat_e_100 = []
         self.stat_qm = []
         self.stat_cm = []
@@ -105,8 +94,8 @@ class QFADriver(Driver):
 
     def prefix(self):
         pref = "q_e%d_" % self.explorate + self.fa.prefix()
-        if self.TEST_FA:
-            pref += 'T_' + self.fa_test.prefix()
+        if self.mimic_fa:
+            pref += 'M_' + self.mimic_fa.prefix()
         return pref
 
     def restart_exploration(self, scale_explorate=1):
@@ -133,7 +122,7 @@ class QFADriver(Driver):
             steer, accel = self.fa.best_action(S)
             
             #debugging
-#             steer2, accel2 = self.fa_test.best_action(S)
+#             steer2, accel2 = self.mimic_fa.best_action(S)
 #             if steer == steer2:
 #                 self.actions_matched += 0.5
 #             if accel == accel2:
@@ -183,8 +172,8 @@ class QFADriver(Driver):
             
             self.fa.record(S, A, target)
             
-            if self.TEST_FA:
-                self.fa_test.record(S, A, target)
+            if self.mimic_fa:
+                self.mimic_fa.record(S, A, target)
             
             self.C[I] += 1
             self.N[S] += 1
@@ -192,8 +181,8 @@ class QFADriver(Driver):
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
             delta = (target - self.fa.value(S, A))
             self.avg_delta += 0.02 * (delta - self.avg_delta)
-            if self.TEST_FA:
-                delta2 = (target - self.fa_test.value(S, A))
+            if self.mimic_fa:
+                delta2 = (target - self.mimic_fa.value(S, A))
                 self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
             
             S, A = S_, A_
@@ -205,8 +194,8 @@ class QFADriver(Driver):
     
     def update_fa(self):
         self.fa.update()
-        if self.TEST_FA:
-            self.fa_test.update()
+        if self.mimic_fa:
+            self.mimic_fa.update()
 
         # debugging
         self.actions_matched = 0
@@ -221,7 +210,7 @@ class QFADriver(Driver):
             self.stat_qm.append(self.Q.sum(axis=(1,2,3,4,5)))
 
             self.stat_dlm.append(self.avg_delta)
-            if self.TEST_FA:
+            if self.mimic_fa:
                 self.stat_dlm2.append(self.avg_delta2)
             
 #             self.logger.debug("Portion of matched actions: %0.4f",
@@ -243,8 +232,8 @@ class QFADriver(Driver):
         self.q_plotter.play_animation(save=True, pref="QLanes")
         self.qx_plotter.play_animation(show=True, save=True, pref="QMaxLanes_%s" % pref)
 
-        if self.TEST_FA:
-            self.fa_test.report_stats(pref)
+        if self.mimic_fa:
+            self.mimic_fa.report_stats(pref)
             util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
-                      ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref=pref+"delta",
+                      ["Avg ΔQ fa", "Avg ΔQ mimic"], pref=pref+"delta",
                       ylim=None)

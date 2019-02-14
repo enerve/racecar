@@ -23,7 +23,8 @@ class Driver(object):
                  num_speeds,
                  num_directions,
                  num_steer_positions,
-                 num_accel_positions):
+                 num_accel_positions,
+                 mimic_fa):
         '''
         Constructor
         '''
@@ -40,6 +41,7 @@ class Driver(object):
         self.num_directions = num_directions
         self.num_steer_positions = num_steer_positions
         self.num_accel_positions = num_accel_positions
+        self.mimic_fa = mimic_fa
 
         # C is the count of visits to state/action
         self.C = np.zeros((num_junctures,
@@ -55,11 +57,11 @@ class Driver(object):
     def restart_exploration(self):
         pass
     
-    def run_best_episode(self, track, car, use_test_fa=False):
+    def run_best_episode(self, track, car, use_mimic=False):
         ''' Runs an episode picking the best actions based on the driver's
             function approximator
         '''
-        fa = self.fa if not use_test_fa else self.fa_test
+        fa = self.fa if not use_mimic else self.mimic_fa
         
         environment = Environment(track,
                                   car,

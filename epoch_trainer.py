@@ -36,10 +36,10 @@ class EpochTrainer:
         self.stat_bestpath_juncture = []
         self.stat_e_bp = []
 
-        # track testFA peformance
-        self.stat_test_bestpath_times = []
-        # track testFA recent average of rewards collected, as iterations progress
-        self.stat_test_bestpath_R = []
+        # track mimicFA performance
+        self.stat_mimic_bestpath_times = []
+        # track mimicFA recent average of rewards collected, as iterations progress
+        self.stat_mimic_bestpath_R = []
 
         # track student peformance
         self.stat_student_bestpath_times = []
@@ -114,14 +114,13 @@ class EpochTrainer:
                         self.stat_e_bp.append(ep)
                         self.stat_recent_total_R.append(recent_total_R)
                         self.stat_bestpath_juncture.append(bestpath_env.curr_juncture)
-                        # testFA
-                        if self.driver.TEST_FA:
+                        if self.driver.mimic_fa:
                             bestpath_R, bestpath_env, _ = self.driver.run_best_episode(
-                                self.track, self.car, use_test_fa=True)
-                            self.stat_test_bestpath_times.append(bestpath_env.total_time_taken() 
+                                self.track, self.car, use_mimic=True)
+                            self.stat_mimic_bestpath_times.append(bestpath_env.total_time_taken() 
                                                        if bestpath_env.has_reached_finish() 
                                                        else 500)
-                            self.stat_test_bestpath_R.append(bestpath_R)
+                            self.stat_mimic_bestpath_R.append(bestpath_R)
 
                         if self.student:
                             bestpath_R, bestpath_env, _ = self.student.run_best_episode(
@@ -216,14 +215,14 @@ class EpochTrainer:
                    "Reward for best-action path"],
                   title="Performance over time",
                   pref="bpt")
-        if self.driver.TEST_FA:
-            util.plot([[x for x in self.stat_test_bestpath_times],
-                       self.stat_recent_total_R, self.stat_test_bestpath_R],
+        if self.driver.mimic_fa:
+            util.plot([[x for x in self.stat_mimic_bestpath_times],
+                       self.stat_recent_total_R, self.stat_mimic_bestpath_R],
                       self.stat_e_bp,
                       ["Finish time by best-action path", "Recent avg total reward",
                        "Reward for best-action path"],
-                      title="TestFA Performance over time",
-                      pref="t_bpt")
+                      title="Mimic Performance over time",
+                      pref="m_bpt")
         if self.student:
             util.plot([self.stat_student_bestpath_times,
                        self.stat_recent_total_R, self.stat_student_bestpath_R],

@@ -18,8 +18,6 @@ class SarsaFADriver(Driver):
     Sarsa
     '''
 
-    TEST_FA = False
-
     def __init__(self, gamma, explorate,
                  fa,
                  num_junctures,
@@ -27,11 +25,14 @@ class SarsaFADriver(Driver):
                  num_speeds,
                  num_directions,
                  num_steer_positions,
-                 num_accel_positions):
+                 num_accel_positions,
+                 mimic_fa):
         '''
         Constructor
-        fa is the value function approximator that gides the episodes and
-            leans on the job, using the Sarsa algorithm
+        fa is the value function approximator that guides the episodes and
+            learns on the job, using the Sarsa algorithm
+        mimic_fa is a value function approximator that tries to learn from the
+            guide driver, using the same algorithm.
         '''
         super().__init__(fa,
                          num_junctures,
@@ -39,7 +40,8 @@ class SarsaFADriver(Driver):
                          num_speeds,
                          num_directions,
                          num_steer_positions,
-                         num_accel_positions)
+                         num_accel_positions,
+                         mimic_fa)
         
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -47,23 +49,9 @@ class SarsaFADriver(Driver):
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
         
-        if self.TEST_FA:
-            # For testing the function-approxiating capabilities of any new
-            # potential FAs.
-            from function import PolynomialRegression
-            self.fa_test = PolynomialRegression(
-                            0.01, # alpha ... #4e-5 old alpha without batching
-                            0.02, # regularization constant
-                            256, # batch_size
-                            250, # max_iterations
-                            num_junctures,
-                            num_lanes,
-                            num_speeds,
-                            num_directions,
-                            num_steer_positions,
-                            num_accel_positions)        
-            #self.avg_delta2 = 0
-            #self.stat_dlm2 = []
+        if self.mimic_fa:
+            self.avg_delta2 = 0
+            self.stat_dlm2 = []
         
         # TODO: move N to FA?
         # N is the count of visits to state
@@ -106,8 +94,8 @@ class SarsaFADriver(Driver):
 
     def prefix(self):
         pref = "sarsa_e%d_" % self.explorate + self.fa.prefix()
-        if self.TEST_FA:
-            pref += 'T_' + self.fa_test.prefix()
+        if self.mimic_fa:
+            pref += 'M_' + self.mimic_fa.prefix()
         return pref
 
     def restart_exploration(self, scale_explorate=1):
@@ -136,7 +124,7 @@ class SarsaFADriver(Driver):
             steer, accel = self.fa.best_action(S)
             
             #debugging
-#             steer2, accel2 = self.fa_test.best_action(S)
+#             steer2, accel2 = self.mimic_fa.best_action(S)
 #             if steer == steer2:
 #                 self.actions_matched += 0.5
 #             if accel == accel2:
@@ -185,8 +173,8 @@ class SarsaFADriver(Driver):
             
             self.fa.record(S, A, target)
             
-            # (TEMP) Also train fa_test, to compare for debugging
-            # self.fa_test.record(S, A, target)
+            if self.mimic_fa:
+                self.mimic_fa.record(S, A, target)
             
             self.C[I] += 1
             self.N[S] += 1
@@ -194,8 +182,9 @@ class SarsaFADriver(Driver):
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
             delta = (target - self.fa.value(S, A))
             self.avg_delta += 0.02 * (delta - self.avg_delta)
-            #delta2 = (target - self.fa_test.value(S, A))
-            #self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
+            if self.mimic_fa:
+                delta2 = (target - self.mimic_fa.value(S, A))
+                self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
 
             S, A = S_, A_
             total_R += R
@@ -218,7 +207,8 @@ class SarsaFADriver(Driver):
 
     def update_fa(self):
         self.fa.update()
-        #self.fa_test.update()
+        if self.mimic_fa:
+            self.mimic_fa.update()
 
         # debugging
         self.actions_matched = 0
@@ -227,7 +217,8 @@ class SarsaFADriver(Driver):
     def report_stats(self, pref):
         super().report_stats(pref)
         
-        #self.fa_test.report_stats(pref)
+        if self.mimic_fa:
+            self.mimic_fa.report_stats(pref)
 
         util.plot([self.stat_dlm], self.stat_e_100,
                   ["Avg ΔQ"], pref=pref+"delta",
@@ -235,5 +226,5 @@ class SarsaFADriver(Driver):
         self.fa.report_stats(pref)
 
 #         util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
-#                   ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref="delta",
+#                   ["Avg ΔQ fa", "Avg ΔQ mimic"], pref="delta",
 #                   ylim=None)

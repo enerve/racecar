@@ -13,6 +13,7 @@ from driver import *
 from function import MultiPolynomialRegression
 from function import PolynomialRegression
 from function import QLookup
+from circle_feature_eng import CircleFeatureEng
 import cmd_line
 import log
 import numpy as np
@@ -30,7 +31,7 @@ def main():
     log.configure_logger(logger, "RaceCar")
     logger.setLevel(logging.DEBUG)
     
-    # --------------
+    # -------------- Configure track
     
     NUM_JUNCTURES = 28
     NUM_MILESTONES = 27
@@ -61,15 +62,15 @@ def main():
     np.random.seed(seed)
 
     # ------------------ Guide driver FA -----------------
-#     fa_Q = QLookup(0.7,  # alpha
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
+    driver_fa = QLookup(0.7,  # alpha
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS)
     
-#     fa_Poly =  PolynomialRegression(
+#     driver_fa =  PolynomialRegression(
 #                     0.002, # alpha ... #4e-5 old alpha without batching
 #                     0.5, # regularization constant
 #                     256, # batch_size
@@ -79,26 +80,58 @@ def main():
 #                     NUM_SPEEDS,
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+#     fe = CircleFeatureEng(
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+#     driver_fa = MultiPolynomialRegression(
+#                     0.0001, # alpha ... #4e-5 old alpha without batching
+#                     0.5, # regularization constant
+#                     256, # batch_size
+#                     200, # max_iterations
+#                     0.000, # dampen_by
+#                     fe)
+
+    # ------------------ Mimic FA -----------------
+    mimic_fa = None
+
+#     mimic_fa = PolynomialRegression(
+#                     0.01, # alpha ... #4e-5 old alpha without batching
+#                     0.002, # regularization constant
+#                     256, # batch_size
+#                     50000, # max_iterations
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)        
-    fa_Multi = MultiPolynomialRegression(
-                    0.0001, # alpha ... #4e-5 old alpha without batching
-                    0.05, # regularization constant
-                    256, # batch_size
-                    200, # max_iterations
+
+    fe = CircleFeatureEng(
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS,
-                    dampen_by=0.000)
+                    NUM_ACCEL_POSITIONS)
+    mimic_fa = MultiPolynomialRegression(
+                    0.0002, # alpha ... #4e-5 old alpha without batching
+                    0.002, # regularization constant
+                    256, # batch_size
+                    500, # max_iterations
+                    0.000, # dampen_by
+                    fe)    
 
     # ------------------ Guide driver RL algorithm ---------------
 
 #     driver = SarsaFADriver(
 #                     1, # gamma
 #                     200, # explorate
-#                     fa_Q,
+#                     driver_fa,
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
@@ -109,7 +142,7 @@ def main():
 #                     0.85, #lambda
 #                     1, # gamma
 #                     76, # explorate
-#                     fa_Q,
+#                     driver_fa,
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
@@ -119,7 +152,7 @@ def main():
 #     driver = QFADriver(
 #                     1, # gamma
 #                     200, # explorate
-#                     fa_Q,
+#                     driver_fa,
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
@@ -130,23 +163,24 @@ def main():
                     0.35, #lambda
                     1, # gamma
                     76, # explorate
-                    fa_Multi,
+                    driver_fa,
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS)
+                    NUM_ACCEL_POSITIONS,
+                    mimic_fa)
 
     # ------------------ Student driver FA -----------------
-#     fa_Q_S = QLookup(0.7,  # alpha
+#     student_fa = QLookup(0.7,  # alpha
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-#     fa_Poly_S =  PolynomialRegression(
+#     student_fa =  PolynomialRegression(
 #                     0.05, # alpha ... #4e-5 old alpha without batching
 #                     0, # regularization constant
 #                     256, # batch_size
@@ -157,7 +191,7 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-#     fa_Multi_S = MultiPolynomialRegression(
+#     student_fa = MultiPolynomialRegression(
 #                     0.0002, # alpha ... #4e-5 old alpha without batching
 #                     0.002, # regularization constant
 #                     0, # batch_size
@@ -174,7 +208,7 @@ def main():
 
 #     student = QFAStudent(
 #                     1, # gamma
-#                     fa_Q_S,
+#                     student_fa,
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
@@ -184,7 +218,7 @@ def main():
 #     student = SarsaLambdaFAStudent(
 #                     1, #lambda
 #                     1, # gamma
-#                     fa_Poly_S,
+#                     student_fa,
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
@@ -194,7 +228,7 @@ def main():
 #     student = QLambdaFAStudent(
 #                     0.35, #lambda
 #                     1, # gamma
-#                     fa_Multi_S,
+#                     student_fa,
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
@@ -214,13 +248,12 @@ def main():
 
     trainer.train(10, 500, 25)
 
-#     driver.TEST_FA = False
+#     driver.mimic_fa = False
 #     trainer.train(1, 8000, 3)
     trainer.save_to_file()
-#     driver.TEST_FA = True
+#     driver.mimic_fa = mimic_fa
 #     trainer.train(1, 8000, 1)
     
-    logger.debug("Training complete")
     trainer.report_stats()
     
     #     # Load poly training data and train
@@ -236,7 +269,7 @@ def main():
                  b_E.total_time_taken())
     b_E.play_movie(pref="bestmovie")
 
-    if driver.TEST_FA:
+    if driver.mimic_fa:
         t_R, b_E, _ = driver.run_best_episode(track, car, True)
         logger.debug("TestDriver best episode total R = %0.2f time=%d", t_R,
                      b_E.total_time_taken())
