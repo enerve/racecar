@@ -55,10 +55,12 @@ class Driver(object):
     def restart_exploration(self):
         pass
     
-    def run_best_episode(self, track, car):
+    def run_best_episode(self, track, car, use_test_fa=False):
         ''' Runs an episode picking the best actions based on the driver's
             function approximator
         '''
+        fa = self.fa if not use_test_fa else self.fa_test
+        
         environment = Environment(track,
                                   car,
                                   self.num_junctures,
@@ -67,7 +69,7 @@ class Driver(object):
         steps_history = []
         
         S = environment.state_encoding()
-        A = self.fa.best_action(S)
+        A = fa.best_action(S)
         A_ = None
         while S is not None:
             R, S_ = environment.step(A)
@@ -75,7 +77,7 @@ class Driver(object):
             steps_history.append((S, A, R))
             
             if S_ is not None:
-                A_ = self.fa.best_action(S_)
+                A_ = fa.best_action(S_)
 
             S, A = S_, A_
             total_R += R
@@ -100,7 +102,7 @@ class Driver(object):
         pass
 
     def save_model(self, pref=""):
-        pass
+        self.fa.save_model(pref)
 
-    def load_model(self, load_subdir):
-        pass
+    def load_model(self, load_subdir, pref=""):
+        self.fa.load_model(load_subdir, pref)

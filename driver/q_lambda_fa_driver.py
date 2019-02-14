@@ -43,10 +43,6 @@ class QLambdaFADriver(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        # TODO: pre_alg.. alpha etc
-        util.pre_alg = "q_lambda_fa_driver_%d_%0.1f" % (explorate, gamma)
-        self.logger.debug("Algorithm: %s", util.pre_alg)
-
         self.lam = lam      # lookahead parameter
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
@@ -54,12 +50,25 @@ class QLambdaFADriver(Driver):
         if self.TEST_FA:
             # For testing the function-appromiating capabilities of any new
             # potential FAs.
-            from function import PolynomialRegression
-            self.fa_test = PolynomialRegression(
-                            0.01, # alpha ... #4e-5 old alpha without batching
-                            0.02, # regularization constant
+            if False:
+                from function import PolynomialRegression
+                self.fa_test = PolynomialRegression(
+                                0.01, # alpha ... #4e-5 old alpha without batching
+                                0.002, # regularization constant
+                                256, # batch_size
+                                50000, # max_iterations
+                                num_junctures,
+                                num_lanes,
+                                num_speeds,
+                                num_directions,
+                                num_steer_positions,
+                                num_accel_positions)        
+            from function import MultiPolynomialRegression
+            self.fa_test = MultiPolynomialRegression(
+                            0.002, # alpha ... #4e-5 old alpha without batching
+                            0.002, # regularization constant
                             256, # batch_size
-                            250, # max_iterations
+                            500, # max_iterations
                             num_junctures,
                             num_lanes,
                             num_speeds,
@@ -67,7 +76,9 @@ class QLambdaFADriver(Driver):
                             num_steer_positions,
                             num_accel_positions)        
             self.avg_delta2 = 0
+            self.avg_delta3 = 0
             self.stat_dlm2 = []
+            self.stat_dlm3 = []
 
         self.eligible_mult = [(lam * gamma) ** i for i in range(num_junctures)]
         self.eligible_states = [None for i in range(num_junctures)]
@@ -99,6 +110,7 @@ class QLambdaFADriver(Driver):
         self.stat_qm = []
         self.stat_cm = []
         self.stat_rm = []
+        self.stat_fa_error = []
         
         self.stat_debug_qv = []
         self.stat_debug_n = []
@@ -117,6 +129,12 @@ class QLambdaFADriver(Driver):
 
         self.num_resets = 0
         self.num_steps = 0
+
+    def prefix(self):
+        pref = "q_lambda_%d_%0.2f_" % (self.explorate, self.lam) + self.fa.prefix()
+        if self.TEST_FA:
+            pref += 'T_' + self.fa_test.prefix()
+        return pref
 
     def restart_exploration(self, scale_explorate=1):
         super().restart_exploration()
@@ -217,11 +235,12 @@ class QLambdaFADriver(Driver):
             self.num_steps += 1
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
-            delta = (target - self.fa.value(S, A))
-            self.avg_delta += 0.02 * (delta - self.avg_delta)
+            self.avg_delta += 0.2 * (delta - self.avg_delta)
             if self.TEST_FA:
                 delta2 = (target - self.fa_test.value(S, A))
-                self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
+                self.avg_delta2 += 0.2 * (delta2 - self.avg_delta2)
+                delta3 = (delta - delta2)
+                self.avg_delta3 += 0.2 * (delta3 - self.avg_delta3)
             
             S, A = S_, A_
             total_R += R
@@ -254,26 +273,36 @@ class QLambdaFADriver(Driver):
         
         if util.checkpoint_reached(ep, num_episodes // 100):
             self.stat_e_100.append(ep)
+            # TODO: Temp, for QLookup:
+#             self.stat_fa_error.append(self.fa.error_running_avg)
 
             self.stat_dlm.append(self.avg_delta)
             if self.TEST_FA:
                 self.stat_dlm2.append(self.avg_delta2)
+                self.stat_dlm3.append(self.avg_delta3)
             
             #self.logger.debug("Portion of matched actions: %0.4f",
             #                  self.actions_matched / self.total_max_actions_picked)
 
     def report_stats(self, pref):
         super().report_stats(pref)
-        util.plot([self.stat_dlm], self.stat_e_100,
-                  ["Avg ΔQ fa"], pref=pref+"delta",
-                  ylim=None)
+#         util.plot([self.stat_dlm], self.stat_e_100,
+#                   ["Avg ΔQ fa"], pref=pref+"delta",
+#                   ylim=None)
         self.fa.report_stats(pref)
+#         util.plot([self.stat_fa_error], self.stat_e_100,
+#                   ["fa error cost"], pref=pref+"err",
+#                   ylim=None)
 
         if self.TEST_FA:
             self.fa_test.report_stats(pref)
-            util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
-                      ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref=pref+"delta",
-                      ylim=None)
+#             util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
+#                       ["Avg ΔQ fa", "Avg ΔQ fa_test"], pref=pref+"delta",
+#                       ylim=None)
+#             util.plot([self.stat_dlm, self.stat_dlm2, self.stat_dlm3],
+#                       self.stat_e_100,
+#                       ["Avg ΔQ fa", "Avg ΔQ fa_test", "ΔΔQ"], pref=pref+"delta",
+#                       ylim=None)
 
         self.logger.debug("Average length of eligibility trace: %0.2f", 
                           self.num_steps / self.num_resets)

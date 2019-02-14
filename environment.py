@@ -190,7 +190,7 @@ class Environment(object):
         if show:
             plt.show()
         if save:
-            plt.rcParams['animation.ffmpeg_path'] = u'/Users/erw/miniconda2/envs/my_env/bin/ffmpeg'
+            plt.rcParams['animation.ffmpeg_path'] = util.arg_bin_dir + '/ffmpeg'
             Writer = animation.writers['ffmpeg']
             writer = Writer(fps=15, metadata=dict(artist='enerve'), bitrate=1800)
     

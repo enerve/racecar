@@ -39,10 +39,6 @@ class SarsaLambdaFAStudent(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        # TODO: pre_alg.. alpha etc
-        util.pre_alg = "sarsa_lambda_fa_student_%0.1f" % gamma
-        self.logger.debug("Algorithm: %s", util.pre_alg)
-
         self.lam = lam      # lookahead parameter
         self.gamma = gamma  # weight given to predicted future
 
@@ -92,6 +88,9 @@ class SarsaLambdaFAStudent(Driver):
         self.num_resets = 0
         self.num_steps = 0
 
+    def prefix(self):
+        return "sarsa_lambda_l%0.2f_" % self.lam + self.fa.prefix()
+
     def observe_episode(self, steps_history):
         ''' Collects training data based on given episode data. 
             steps_history: list of steps, each a tuples (of S, A, R),
@@ -131,8 +130,8 @@ class SarsaLambdaFAStudent(Driver):
             self.num_steps += 1
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
-            delta = (target - self.fa.value(S, A))
-            self.avg_delta += 0.02 * (delta - self.avg_delta)
+            #delta = (target - self.fa.value(S, A))
+            self.avg_delta += 0.2 * (delta - self.avg_delta)
             
             S, A, R, curr_value = S_, A_, R_, Q_at_next
 
@@ -146,6 +145,7 @@ class SarsaLambdaFAStudent(Driver):
         self.num_resets += 1
     
     def update_fa(self):
+        self.fa.store_training_data("student_train")
         self.fa.update()
 
     def collect_stats(self, ep, num_episodes):

@@ -39,10 +39,6 @@ class QLambdaFAStudent(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        # TODO: pre_alg.. alpha etc
-        util.pre_alg = "q_lambda_fa_student_%0.1f" % (gamma)
-        self.logger.debug("Algorithm: %s", util.pre_alg)
-
         self.lam = lam      # lookahead parameter
         self.gamma = gamma  # weight given to predicted future
         
@@ -86,6 +82,9 @@ class QLambdaFAStudent(Driver):
 
         # track average change in Q, as iterations progress
         self.stat_dlm = []
+
+    def prefix(self):
+        return "q_lambda_l%0.2f_" % self.lam + self.fa.prefix()
 
     def observe_episode(self, steps_history):
         ''' Collects training data based on given episode data. 

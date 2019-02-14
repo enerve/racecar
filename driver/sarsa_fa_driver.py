@@ -18,6 +18,8 @@ class SarsaFADriver(Driver):
     Sarsa
     '''
 
+    TEST_FA = False
+
     def __init__(self, gamma, explorate,
                  fa,
                  num_junctures,
@@ -42,30 +44,26 @@ class SarsaFADriver(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        # TODO: pre_alg.. alpha etc
-        util.pre_alg = "sarsa_fa_driver_%d_%0.1f" % (explorate, gamma)
-        self.logger.debug("Algorithm: %s", util.pre_alg)
-
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
         
-        # For testing the function-approxiating capabilities of any new
-        # potential FAs.
-#         from function import PolynomialRegression
-#         self.fa_test = PolynomialRegression(
-#                         0.01, # alpha ... #4e-5 old alpha without batching
-#                         0.02, # regularization constant
-#                         256, # batch_size
-#                         250, # max_iterations
-#                         num_junctures,
-#                         num_lanes,
-#                         num_speeds,
-#                         num_directions,
-#                         num_steer_positions,
-#                         num_accel_positions)        
-        #self.avg_delta2 = 0
-        #self.stat_dlm2 = []
-
+        if self.TEST_FA:
+            # For testing the function-approxiating capabilities of any new
+            # potential FAs.
+            from function import PolynomialRegression
+            self.fa_test = PolynomialRegression(
+                            0.01, # alpha ... #4e-5 old alpha without batching
+                            0.02, # regularization constant
+                            256, # batch_size
+                            250, # max_iterations
+                            num_junctures,
+                            num_lanes,
+                            num_speeds,
+                            num_directions,
+                            num_steer_positions,
+                            num_accel_positions)        
+            #self.avg_delta2 = 0
+            #self.stat_dlm2 = []
         
         # TODO: move N to FA?
         # N is the count of visits to state
@@ -105,6 +103,12 @@ class SarsaFADriver(Driver):
         
         self.actions_matched = 0
         self.total_max_actions_picked = 0
+
+    def prefix(self):
+        pref = "sarsa_e%d_" % self.explorate + self.fa.prefix()
+        if self.TEST_FA:
+            pref += 'T_' + self.fa_test.prefix()
+        return pref
 
     def restart_exploration(self, scale_explorate=1):
         super().restart_exploration()

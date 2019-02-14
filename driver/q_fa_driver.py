@@ -43,10 +43,6 @@ class QFADriver(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        # TODO: pre_alg.. alpha etc
-        util.pre_alg = "q_fa_driver_%d_%0.1f" % (explorate, gamma)
-        self.logger.debug("Algorithm: %s", util.pre_alg)
-
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
         
@@ -68,7 +64,6 @@ class QFADriver(Driver):
             self.avg_delta2 = 0
             self.stat_dlm2 = []
 
-        
         # TODO: move N to FA?
         # N is the count of visits to state
         self.N = np.zeros((self.num_junctures,
@@ -107,6 +102,12 @@ class QFADriver(Driver):
         
         self.actions_matched = 0
         self.total_max_actions_picked = 0
+
+    def prefix(self):
+        pref = "q_e%d_" % self.explorate + self.fa.prefix()
+        if self.TEST_FA:
+            pref += 'T_' + self.fa_test.prefix()
+        return pref
 
     def restart_exploration(self, scale_explorate=1):
         super().restart_exploration()
@@ -202,19 +203,6 @@ class QFADriver(Driver):
 
         return total_R, environment, steps_history
     
-    def collect_stats(self, ep, num_episodes):
-        super().collect_stats(ep, num_episodes)
-        
-        if util.checkpoint_reached(ep, num_episodes // 100):
-            self.stat_e_100.append(ep)
-
-            self.stat_dlm.append(self.avg_delta)
-            if self.TEST_FA:
-                self.stat_dlm2.append(self.avg_delta2)
-            
-#             self.logger.debug("Portion of matched actions: %0.4f",
-#                               self.actions_matched / self.total_max_actions_picked)
-
     def update_fa(self):
         self.fa.update()
         if self.TEST_FA:
@@ -224,12 +212,36 @@ class QFADriver(Driver):
         self.actions_matched = 0
         self.total_max_actions_picked = 0
 
+    def collect_stats(self, ep, num_episodes):
+        super().collect_stats(ep, num_episodes)
+        
+        if util.checkpoint_reached(ep, num_episodes // 100):
+            self.stat_e_100.append(ep)
+
+            self.stat_qm.append(self.Q.sum(axis=(1,2,3,4,5)))
+
+            self.stat_dlm.append(self.avg_delta)
+            if self.TEST_FA:
+                self.stat_dlm2.append(self.avg_delta2)
+            
+#             self.logger.debug("Portion of matched actions: %0.4f",
+#                               self.actions_matched / self.total_max_actions_picked)
+
+        if util.checkpoint_reached(ep, num_episodes // 200):
+            self.stat_e_200.append(ep)
+    
+            self.q_plotter.add_image(self.fa.plottable((2, 3, 4, 5)))
+            self.qx_plotter.add_image(self.fa.plottable((2, 3, 4, 5), pick_max=True))
+
     def report_stats(self, pref):
         super().report_stats(pref)
         
         util.plot([self.stat_dlm], self.stat_e_100,
                   ["Avg ΔQ table"], pref=pref+"delta",
                   ylim=None)#(-100, 1000))
+
+        self.q_plotter.play_animation(save=True, pref="QLanes")
+        self.qx_plotter.play_animation(show=True, save=True, pref="QMaxLanes_%s" % pref)
 
         if self.TEST_FA:
             self.fa_test.report_stats(pref)

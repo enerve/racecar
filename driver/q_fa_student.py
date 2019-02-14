@@ -38,10 +38,6 @@ class QFAStudent(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        # TODO: pre_alg.. alpha etc
-        util.pre_alg = "q_fa_student_%0.1f" % (gamma)
-        self.logger.debug("Algorithm: %s", util.pre_alg)
-
         self.gamma = gamma  # weight given to predicted future
         
         # TODO: move N to FA?
@@ -79,6 +75,9 @@ class QFAStudent(Driver):
 
         # track average change in Q, as iterations progress
         self.stat_dlm = []
+
+    def prefix(self):
+        return "q_" + self.fa.prefix()
 
     def observe_episode(self, steps_history):
         ''' Collects training data based on given episode data. 

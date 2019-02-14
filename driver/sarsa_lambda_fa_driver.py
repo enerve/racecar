@@ -43,10 +43,6 @@ class SarsaLambdaFADriver(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        # TODO: pre_alg.. alpha etc
-        util.pre_alg = "sarsa_lambda_fa_driver_%d_%0.1f" % (explorate, gamma)
-        self.logger.debug("Algorithm: %s", util.pre_alg)
-
         self.lam = lam      # lookahead parameter
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
@@ -120,6 +116,12 @@ class SarsaLambdaFADriver(Driver):
         self.num_resets = 0
         self.num_steps = 0
 
+    def prefix(self):
+        pref = "sarsa_lambda_%d_%0.2f_" % (self.explorate, self.lam) + self.fa.prefix()
+        if self.TEST_FA:
+            pref += 'T_' + self.fa_test.prefix()
+        return pref
+
     def restart_exploration(self, scale_explorate=1):
         super().restart_exploration()
         
@@ -137,6 +139,7 @@ class SarsaLambdaFADriver(Driver):
         n = self.N[S]
         N0 = self.explorate
         epsilon = N0 / (N0 + n)
+        #epsilon = 1/4 # TODO
       
         if random.random() >= epsilon:
             # Pick best
@@ -255,11 +258,22 @@ class SarsaLambdaFADriver(Driver):
             #self.logger.debug("Portion of matched actions: %0.4f",
             #                  self.actions_matched / self.total_max_actions_picked)
 
+        if util.checkpoint_reached(ep, num_episodes // 200):
+            self.stat_e_200.append(ep)
+    
+            self.q_plotter.add_image(self.fa.plottable((2, 3, 4, 5)))
+            self.qx_plotter.add_image(self.fa.plottable((2, 3, 4, 5), pick_max=True))
+
     def report_stats(self, pref):
         super().report_stats(pref)
-        util.plot([self.stat_dlm], self.stat_e_100,
-                  ["Avg ΔQ fa"], pref=pref+"delta",
-                  ylim=None)
+
+#         util.plot([self.stat_dlm], self.stat_e_100,
+#                   ["Avg ΔQ fa"], pref=pref+"delta",
+#                   ylim=None)
+        self.fa.report_stats(pref)
+
+        #self.q_plotter.play_animation(save=True, pref="QLanes")
+        #self.qx_plotter.play_animation(show=True, save=True, pref="QMaxLanes_%s" % pref)
 
         if self.TEST_FA:
             self.fa_test.report_stats(pref)

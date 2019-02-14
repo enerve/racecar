@@ -8,9 +8,9 @@ import logging
 
 from car import Car
 from track import CircleTrack
-from trainer import Trainer
 from epoch_trainer import EpochTrainer
 from driver import *
+from function import MultiPolynomialRegression
 from function import PolynomialRegression
 from function import QLookup
 import cmd_line
@@ -23,12 +23,11 @@ import util
 def main():
     args = cmd_line.parse_args()
 
-    util.prefix_init(args)
+    util.init(args)
     util.pre_problem = 'RC circle'
 
-#     logger = logging.getLogger(__name__)
     logger = logging.getLogger()
-    log.configure_logger(logger, "RaceCar FS")
+    log.configure_logger(logger, "RaceCar")
     logger.setLevel(logging.DEBUG)
     
     # --------------
@@ -61,14 +60,41 @@ def main():
     random.seed(seed)
     np.random.seed(seed)
 
-    # ------------------ Guide driver --------------------
-    fa_Q = QLookup(0.7,  # alpha
+    # ------------------ Guide driver FA -----------------
+#     fa_Q = QLookup(0.7,  # alpha
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+    
+#     fa_Poly =  PolynomialRegression(
+#                     0.002, # alpha ... #4e-5 old alpha without batching
+#                     0.5, # regularization constant
+#                     256, # batch_size
+#                     5000, #250, # max_iterations
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)        
+    fa_Multi = MultiPolynomialRegression(
+                    0.0001, # alpha ... #4e-5 old alpha without batching
+                    0.05, # regularization constant
+                    256, # batch_size
+                    200, # max_iterations
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
                     NUM_DIRECTIONS,
                     NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS)
+                    NUM_ACCEL_POSITIONS,
+                    dampen_by=0.000)
+
+    # ------------------ Guide driver RL algorithm ---------------
+
 #     driver = SarsaFADriver(
 #                     1, # gamma
 #                     200, # explorate
@@ -79,17 +105,17 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-    driver = SarsaLambdaFADriver(
-                    0.35, #lambda
-                    1, # gamma
-                    76, # explorate
-                    fa_Q,
-                    NUM_JUNCTURES,
-                    NUM_LANES,
-                    NUM_SPEEDS,
-                    NUM_DIRECTIONS,
-                    NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS)
+#     driver = SarsaLambdaFADriver(
+#                     0.85, #lambda
+#                     1, # gamma
+#                     76, # explorate
+#                     fa_Q,
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
 #     driver = QFADriver(
 #                     1, # gamma
 #                     200, # explorate
@@ -100,11 +126,42 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-#     driver = QLambdaFADriver(
-#                     0.35, #lambda
-#                     1, # gamma
-#                     76, # explorate
-#                     fa_Q,
+    driver = QLambdaFADriver(
+                    0.35, #lambda
+                    1, # gamma
+                    76, # explorate
+                    fa_Multi,
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS)
+
+    # ------------------ Student driver FA -----------------
+#     fa_Q_S = QLookup(0.7,  # alpha
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+#     fa_Poly_S =  PolynomialRegression(
+#                     0.05, # alpha ... #4e-5 old alpha without batching
+#                     0, # regularization constant
+#                     256, # batch_size
+#                     1000, #250, # max_iterations
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+#     fa_Multi_S = MultiPolynomialRegression(
+#                     0.0002, # alpha ... #4e-5 old alpha without batching
+#                     0.002, # regularization constant
+#                     0, # batch_size
+#                     200, # max_iterations
 #                     NUM_JUNCTURES,
 #                     NUM_LANES,
 #                     NUM_SPEEDS,
@@ -112,25 +169,9 @@ def main():
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
 
-    # ------------------ Student driver --------------------
-    fa_Q_S = QLookup(0.7,  # alpha
-                    NUM_JUNCTURES,
-                    NUM_LANES,
-                    NUM_SPEEDS,
-                    NUM_DIRECTIONS,
-                    NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS)
-#     fa_Poly_S =  PolynomialRegression(
-#                     0.01, # alpha ... #4e-5 old alpha without batching
-#                     0.02, # regularization constant
-#                     256, # batch_size
-#                     250, # max_iterations
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)        
+    # ------------------ Student driver RL algorithm -------------
+    student = None
+
 #     student = QFAStudent(
 #                     1, # gamma
 #                     fa_Q_S,
@@ -140,41 +181,73 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-    student = QLambdaFAStudent(
-                    0.35, #lambda
-                    1, # gamma
-                    fa_Q_S,
-                    NUM_JUNCTURES,
-                    NUM_LANES,
-                    NUM_SPEEDS,
-                    NUM_DIRECTIONS,
-                    NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS)
+#     student = SarsaLambdaFAStudent(
+#                     1, #lambda
+#                     1, # gamma
+#                     fa_Poly_S,
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+#     student = QLambdaFAStudent(
+#                     0.35, #lambda
+#                     1, # gamma
+#                     fa_Multi_S,
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+    
+    # ------------------ Training -------------------
 
     #trainer = Trainer(driver, track, car)
     trainer = EpochTrainer(driver, track, car, student)
-    #subdir = "RC rect_qlearn_100_1.0_1.0_363312_"
-    subdir = None
-    if subdir:
-        driver.load_model(subdir)
-        trainer.load_stats(subdir)
-    #trainer.train(5000)
-    #trainer.train(1, 5000)
-    trainer.train(8, 2000)
-    trainer.report_stats()
-
-
     
-    #trainer.play_best()
-#     best_env = trainer.best_environment()
-#     debug_driver = ManualDriver(NUM_JUNCTURES,
-#                                 NUM_LANES,
-#                                 NUM_SPEEDS,
-#                                 NUM_DIRECTIONS,
-#                                 NUM_STEER_POSITIONS,
-#                                 NUM_ACCEL_POSITIONS,
-#                                 best_env.get_action_history())
-#     debug_driver.run_episode(track, car)
+    #trainer.load_from_file("")
+
+    # QLookup 4-explored 8000 episode QLambda-updated Qlookup 
+    #trainer.load_from_file("439945_RC circle_DR_q_lambda_76_0.35_Qtable_a0.7_T_poly_a0.01_r0.002_b256_i50000_3ttt__")
+
+    trainer.train(10, 500, 25)
+
+#     driver.TEST_FA = False
+#     trainer.train(1, 8000, 3)
+    trainer.save_to_file()
+#     driver.TEST_FA = True
+#     trainer.train(1, 8000, 1)
+    
+    logger.debug("Training complete")
+    trainer.report_stats()
+    
+    #     # Load poly training data and train
+    #     subdir = "71177_RC circle_sarsa_lambda_fa_student_1.0_1.0_" # Qlambda driver 
+    #                                                                 # 1 epoch 8000
+    #     fa_Poly_S.load_training_data("student_train", subdir)
+    #     #fa_Poly_S.describe_training_data()
+    #     fa_Poly_S.train()
+    #     fa_Poly_S.report_stats()
+
+    t_R, b_E, _ = driver.run_best_episode(track, car, False)
+    logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
+                 b_E.total_time_taken())
+    b_E.play_movie(pref="bestmovie")
+
+    if driver.TEST_FA:
+        t_R, b_E, _ = driver.run_best_episode(track, car, True)
+        logger.debug("TestDriver best episode total R = %0.2f time=%d", t_R,
+                     b_E.total_time_taken())
+        b_E.play_movie(pref="bestmovie_testfa")
+
+    if student:
+        t_R, b_E, _ = student.run_best_episode(track, car)
+        logger.debug("Student best episode total R = %0.2f time=%d", t_R,
+                 b_E.total_time_taken())
+        b_E.play_movie(pref="bestmovie_student")
+
 
     # --------- CV ---------
 #     import random
