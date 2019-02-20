@@ -18,6 +18,7 @@ import cmd_line
 import log
 import numpy as np
 import random
+import torch
 import util
 
 
@@ -60,6 +61,8 @@ def main():
     seed = 123
     random.seed(seed)
     np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
 
     # ------------------ Guide driver FA -----------------
     driver_fa = QLookup(0.7,  # alpha
@@ -246,7 +249,7 @@ def main():
     # QLookup 4-explored 8000 episode QLambda-updated Qlookup 
     #trainer.load_from_file("439945_RC circle_DR_q_lambda_76_0.35_Qtable_a0.7_T_poly_a0.01_r0.002_b256_i50000_3ttt__")
 
-    trainer.train(10, 500, 5)
+    trainer.train(5, 500, 1)
 
 #     driver.mimic_fa = False
 #     trainer.train(1, 8000, 3)
@@ -264,22 +267,23 @@ def main():
     #     fa_Poly_S.train()
     #     fa_Poly_S.report_stats()
 
-    t_R, b_E, _ = driver.run_best_episode(track, car, False)
-    logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
-                 b_E.total_time_taken())
-    b_E.play_movie(pref="bestmovie")
-
-    if driver.mimic_fa:
-        t_R, b_E, _ = driver.run_best_episode(track, car, True)
-        logger.debug("Mimic best episode total R = %0.2f time=%d", t_R,
+    if False:
+        t_R, b_E, _ = driver.run_best_episode(track, car, False)
+        logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
                      b_E.total_time_taken())
-        b_E.play_movie(pref="bestmovie_mimic")
-
-    if student:
-        t_R, b_E, _ = student.run_best_episode(track, car)
-        logger.debug("Student best episode total R = %0.2f time=%d", t_R,
-                 b_E.total_time_taken())
-        b_E.play_movie(pref="bestmovie_student")
+        b_E.play_movie(pref="bestmovie")
+    
+        if driver.mimic_fa:
+            t_R, b_E, _ = driver.run_best_episode(track, car, True)
+            logger.debug("Mimic best episode total R = %0.2f time=%d", t_R,
+                         b_E.total_time_taken())
+            b_E.play_movie(pref="bestmovie_mimic")
+    
+        if student:
+            t_R, b_E, _ = student.run_best_episode(track, car)
+            logger.debug("Student best episode total R = %0.2f time=%d", t_R,
+                     b_E.total_time_taken())
+            b_E.play_movie(pref="bestmovie_student")
 
 
     # --------- CV ---------
@@ -363,3 +367,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    #cProfile.run('main()', 'timing')
+

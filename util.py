@@ -8,6 +8,7 @@ import logging
 import numpy as np
 import os
 import time
+import torch
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -18,6 +19,13 @@ def init_logger():
     #logger.setLevel(logging.INFO)
     pass
 
+use_gpu = False
+
+def init_gpu(args):
+    global use_gpu
+    if args.gpu and torch.cuda.is_available:
+        print("Cuda is available, using GPU as requested")
+        use_gpu = True
 
 # ------ Drawing ---------
 
@@ -34,6 +42,8 @@ def init(args):
     pre_tym = str(int(round(time.time()) % 1000000))
     pre_outputdir = args.output_dir
     arg_bin_dir = args.bin
+
+    init_gpu(args)
 
     logging.getLogger("matplotlib").setLevel(logging.INFO)
 
@@ -97,6 +107,10 @@ def plot_all(lines, xs, labels=None, title=None, pref=None, ylim=None):
     if ylim:
         plt.ylim(ylim)
     save_plot(pref)
+    plt.show()
+    
+def draw_image(A):
+    plt.imshow(A)
     plt.show()
     
 def scatter(x, y, values, xlabel, ylabel, pref=None):

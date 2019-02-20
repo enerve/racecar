@@ -6,7 +6,8 @@ Created on 14 Feb 2019
 
 import logging
 import math
-import numpy as np
+import torch
+import util
 
 from function import FeatureEng
 
@@ -40,6 +41,8 @@ class CircleFeatureEng(FeatureEng):
         self.num_steer_positions = num_steer_positions
         self.num_accel_positions = num_accel_positions
         
+        self.device = torch.device('cuda' if util.use_gpu else 'cpu')
+
         # Hard-coded normalization params for the RaceCar state parameters
         
         shift_list = [0,
@@ -76,8 +79,8 @@ class CircleFeatureEng(FeatureEng):
             scale_list.extend([2,
                          2])
 
-        self.shift = np.asarray(shift_list)
-        self.scale = np.asarray(scale_list)
+        self.shift = torch.Tensor(shift_list).to(self.device)
+        self.scale = torch.Tensor(scale_list).to(self.device)
         self.num_inputs = len(shift_list)
         
     def num_actions(self):
@@ -90,8 +93,8 @@ class CircleFeatureEng(FeatureEng):
                              't' if self.BOUNDED_FEATURES else 'f')
 
     def initial_W(self):
-        return np.random.randn(self.num_inputs ** self.POLY_DEGREE,
-                               self.num_actions())
+        return torch.randn(self.num_inputs ** self.POLY_DEGREE,
+                           self.num_actions()).to(self.device)
 
     def x_adjust(self, juncture, lane, speed, direction):
         ''' Takes the input params and converts it to an input feature array
@@ -117,17 +120,17 @@ class CircleFeatureEng(FeatureEng):
             x_list.append(max(0, lane - 1))
             x_list.append(max(0, 3 - lane))
 
-        x1 = np.asarray(x_list, dtype='float')
+        x1 = torch.Tensor(x_list).to(self.device)
         x1 -= self.shift
         x1 /= self.scale
 
         x = x1
         if self.POLY_DEGREE >= 2:
-            x = np.outer(x, x1).flatten()
+            x = torch.ger(x, x1).flatten()
             if self.POLY_DEGREE == 3:
-                x = np.outer(x, x1).flatten()
+                x = torch.ger(x, x1).flatten()
             elif self.POLY_DEGREE == 4:
-                x = np.outer(x, x).flatten()
+                x = torch.ger(x, x).flatten()
 
         return x
     

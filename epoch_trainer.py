@@ -107,7 +107,7 @@ class EpochTrainer:
                         
                     len_bp_split = (total_episodes // 100)
                     recent_total_R += (total_R - recent_total_R) * 10 / len_bp_split
-                    if ep > 0 and ep % len_bp_split == len_bp_split - 1:
+                    if (ep + 1) % len_bp_split == 0:
                         bestpath_R, bestpath_env, _ = self.driver.run_best_episode(
                             self.track, self.car)
                         self.stat_bestpath_times.append(bestpath_env.total_time_taken() 

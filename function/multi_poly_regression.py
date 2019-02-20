@@ -9,6 +9,7 @@ import time
 import util
 
 import numpy as np
+import torch
 
 from function.value_function import ValueFunction
 
@@ -44,6 +45,8 @@ class MultiPolynomialRegression(ValueFunction):
         self.max_iterations = max_iterations
         self.feature_eng = feature_eng
         self.adam_update = adam_update
+        
+        self.device = torch.device('cuda' if util.use_gpu else 'cpu')
         
         self.num_actions = feature_eng.num_actions()
 
@@ -82,7 +85,7 @@ class MultiPolynomialRegression(ValueFunction):
 
     def _value(self, X):
         # Calculate polynomial value X * W
-        return np.dot(X, self.W)
+        return X.matmul(self.W)
     
     def value(self, state, action):
         X = self.feature_eng.x_adjust(*state)
@@ -93,7 +96,7 @@ class MultiPolynomialRegression(ValueFunction):
         X = self.feature_eng.x_adjust(*state)
         V = self._value(X)
         
-        i = np.argmax(V)
+        i = torch.argmax(V).item()
         return self.feature_eng.a_tuple(i)
 
     def record(self, state, action, target):
@@ -120,8 +123,10 @@ class MultiPolynomialRegression(ValueFunction):
         util.dump(SHT, fname, "t")
 
     def load_training_data(self, fname, subdir):
-        self.steps_history_sa = util.load(fname, subdir, suffix="SA")
-        self.steps_history_target = util.load(fname, subdir, suffix="t")
+        self.steps_history_sa = torch.from_numpy(
+            util.load(fname, subdir, suffix="SA")).to(self.device)
+        self.steps_history_target = torch.from_numpy(
+            util.load(fname, subdir, suffix="t")).to(self.device)
 
     def update(self):
         ''' Updates the value function model based on data collected since
@@ -132,9 +137,12 @@ class MultiPolynomialRegression(ValueFunction):
         
         self.is_updated = True
 
-    def train(self):
-        # Split up the training data by action
-        start_time = time.clock()
+    def _sample_ids(self, l, n):
+        ids = torch.cuda.FloatTensor(n) if util.use_gpu else torch.FloatTensor(n)
+        ids = (l * ids.uniform_()).long()
+        return ids
+
+    def _prepare_data(self):
         steps_history_x = [[] for _ in range(self.num_actions)]
         steps_history_t = [[] for _ in range(self.num_actions)]
         self.logger.debug("Preparing training data for %d items",
@@ -148,9 +156,12 @@ class MultiPolynomialRegression(ValueFunction):
             steps_history_t[ai].append(t)
             if (i+1) % 10000 == 0:
                 self.logger.debug("  prepared %d", i+1)
+                
+        return steps_history_x, steps_history_t
 
-        self.logger.debug("Prepared training data (%0.2fs)",
-                          time.clock() - start_time)
+    def train(self):
+        # Split up the training data by action
+        steps_history_x, steps_history_t = self._prepare_data()
 
         # Train each action's dataset separately
         sWcollect = None
@@ -158,8 +169,8 @@ class MultiPolynomialRegression(ValueFunction):
         epoch_sht = []
         before_unique = after_unique = 0
         for ai in range(self.num_actions):
-            SHX = np.asarray(steps_history_x[ai])
-            SHT = np.asarray(steps_history_t[ai])
+            SHX = torch.stack(steps_history_x[ai]).to(self.device)
+            SHT = torch.tensor(steps_history_t[ai]).to(self.device)
             a = self.feature_eng.a_tuple(ai)
             self.logger.debug("Train action %s", a)
             w, stat_err, stat_reg, stat_W  = self._train_action(
@@ -168,24 +179,26 @@ class MultiPolynomialRegression(ValueFunction):
             self.stat_error_cost[ai].extend(stat_err)
             self.stat_reg_cost[ai].extend(stat_reg)
             
-            # ---- Sample dataset for later testing
+            # ---- Sample dataset for later testing/statistics
             SHX_test, SHT_test = SHX, SHT
             # Choose a smaller set before uniquifying
-            ids = np.random.choice(len(SHX_test), size=self.NUM_TEST_SAMPLES * 5)
+            ids = self._sample_ids(len(SHX_test), self.NUM_TEST_SAMPLES * 5)
             SHX_test, SHT_test = SHX_test[ids], SHT_test[ids]
             before_unique += SHX_test.shape[0]
             # Collect unique input-features
-            SHX_test, ids = np.unique(SHX_test, axis=0, return_index=True)
+            # TODO: unique is kinda slow. Avoid it.
+            SHX_test, ids = torch.unique(SHX_test, dim=0, return_inverse=True)
             SHT_test = SHT_test[ids]
             after_unique += SHX_test.shape[0]
             # Choose NUM_TEST_SAMPLES rows
-            ids = np.random.choice(len(SHX_test), size=self.NUM_TEST_SAMPLES)
+            ids = self._sample_ids(len(SHX_test), self.NUM_TEST_SAMPLES)
             SHX_test, SHT_test = SHX_test[ids], SHT_test[ids]
             epoch_shx.append(SHX_test)
             epoch_sht.append(SHT_test)
             
             # stats
-            sW = np.asarray(stat_W)  # n * mx
+            # TODO: maybe run this on gpu
+            sW = torch.stack(stat_W).cpu().numpy()  # n * mx
             sW = sW[:, self.sample_W_ids]
             sWcollect = sW if sWcollect is None else np.concatenate(
                 [sWcollect, sW], axis=1) # n * (mx * ma)
@@ -213,12 +226,13 @@ class MultiPolynomialRegression(ValueFunction):
         sum_error_cost_trend = prev_sum_error_cost_trend = 0
         sum_reg_cost = 0
         sum_W = 0
-        debug_start_W = W.copy()
+        debug_start_W = W.clone().detach()
         
         stat_error_cost = []
         stat_reg_cost = []
         stat_W = []
         
+        # TODO: decay alpha over the epochs too
         alpha = self.alpha
         
         for i in range(self.max_iterations):
@@ -230,18 +244,19 @@ class MultiPolynomialRegression(ValueFunction):
                     X = SHX   # N x d
                     Y = SHT   # N
                 else:
-                    ids = np.random.choice(N, size=self.batch_size)
+                    ids = self._sample_ids(N, self.batch_size)
                     X = SHX[ids]   # b x d
                     Y = SHT[ids]   # b
-                V = np.dot(X, W) # b
+                V = X.matmul(W) # b
                 D = V - Y # b
                 
                 # Calculate cost
-                error_cost = 0.5 * np.mean(D**2)
-                reg_cost = 0.5 * self.regularization_param * np.sum(W ** 2)
+                error_cost = 0.5 * torch.mean(D**2)
+                reg_cost = 0.5 * self.regularization_param * torch.dot(W, W)
                 
                 # Find derivative
-                dW = -np.mean(D[:, np.newaxis] * X, axis=0)
+                DX = torch.unsqueeze(D, 1) * X  # b x d
+                dW = -torch.mean(DX, dim=0)
                 dW -= self.regularization_param * W
     
                 
@@ -257,7 +272,7 @@ class MultiPolynomialRegression(ValueFunction):
                     self.second_moment = beta2 * self.second_moment + (1-beta2) * (dW ** 2)
                     vt = self.second_moment / (1 - beta2 ** self.iteration)
                 
-                    W += alpha * mt / (np.sqrt(vt) + eps)
+                    W += alpha * mt / (torch.sqrt(vt) + eps)
                 else:
                     W += alpha * dW
             else:
@@ -295,17 +310,16 @@ class MultiPolynomialRegression(ValueFunction):
                 sum_reg_cost = 0
                 sum_W = 0
 
-            # TODO: remove
             alpha *= (1 - self.dampen_by)
 
         debug_diff_W = (debug_start_W - W)
         self.logger.debug("  trained \tN=%s \tW+=%0.2f \tE=%0.2f", N,
-                          np.sum(debug_diff_W ** 2),
+                          torch.dot(debug_diff_W, debug_diff_W),
                           stat_error_cost[-1])
 
         if False: 
             # Report error stats on full-batch, for debugging
-            SA = np.asarray(self.steps_history_sa)
+            SA = torch.Tensor(self.steps_history_sa).to(self.device)
             X = SHX   # N x d
             Y = SHT   # N
      
@@ -370,12 +384,12 @@ class MultiPolynomialRegression(ValueFunction):
         X = SHX   # N x d
         Y = SHT   # N
         
-        V = np.dot(X, W) # N
+        V = X.matmul(W) # N
         D = V - Y # N
         
         # Calculate cost
-        error_cost = 0.5 * np.sum(D**2)
-        reg_cost = 0.5 * self.regularization_param * np.sum(W ** 2)
+        error_cost = 0.5 * torch.dot(D, D)
+        reg_cost = 0.5 * self.regularization_param * torch.dot(W, W)
 
         return error_cost, reg_cost
 
@@ -401,7 +415,7 @@ class MultiPolynomialRegression(ValueFunction):
         util.plot(sW, range(sW.shape[1]), labels=None, pref="W", ylim=None)
 
     def save_model(self, pref=""):
-        util.dump(self.W, pref+"W")
+        util.dump(self.W.cpu().numpy(), pref+"W")
 
     def load_model(self, load_subdir, pref=""):
         self.logger.debug("Loading W from: %s", load_subdir)
