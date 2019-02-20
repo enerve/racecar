@@ -23,7 +23,8 @@ class QLambdaFAStudent(Driver):
                  num_speeds,
                  num_directions,
                  num_steer_positions,
-                 num_accel_positions):
+                 num_accel_positions,
+                 mimic_fa):
         '''
         Constructor
         fa is the value function approximator that learns from the episodes
@@ -34,7 +35,8 @@ class QLambdaFAStudent(Driver):
                          num_speeds,
                          num_directions,
                          num_steer_positions,
-                         num_accel_positions)
+                         num_accel_positions,
+                         mimic_fa)
         
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)

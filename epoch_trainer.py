@@ -51,7 +51,8 @@ class EpochTrainer:
         
         self.ep = 0
 
-    def train(self, num_epochs, num_episodes_per_epoch, num_explorations = 1):
+    def train(self, num_epochs, num_episodes_per_epoch, num_explorations = 1,
+              store_training_data = False):
         
         total_episodes = num_epochs * num_episodes_per_epoch * num_explorations
 
@@ -60,10 +61,10 @@ class EpochTrainer:
         count_m = np.zeros((smooth, self.driver.num_junctures + 1), dtype=np.int32)
         Eye = np.eye(self.driver.num_junctures + 1)
             
-        self.logger.debug("Starting")
+        self.logger.debug("Starting for %d expls x %d epochs x %d episodes",
+                          num_explorations, num_epochs, num_episodes_per_epoch)
         start_time = time.clock()
         
-        best_R = -10000
         recent_total_R = 0
 
         ep = ep_s = self.ep
@@ -74,6 +75,8 @@ class EpochTrainer:
                 
                 history = [] # history of episodes, each episode a list of tuples of
                              # state, action, reward
+
+                best_R = -10000
                 
                 for ep_ in range(num_episodes_per_epoch):
                     total_R, environment, ep_steps = self.driver.run_episode(
@@ -82,7 +85,7 @@ class EpochTrainer:
             
                     count_m[ep % smooth] = Eye[environment.curr_juncture]
                     
-                    if environment.curr_juncture >= 5:
+                    if environment.curr_juncture >= 6:
                         if total_R > best_R:
                             self.logger.debug("Ep %d  Juncture %d reached with tR=%d T=%d",
                                               ep, environment.curr_juncture, total_R,

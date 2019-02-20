@@ -26,7 +26,8 @@ class MultiPolynomialRegression(ValueFunction):
                  batch_size,
                  max_iterations,
                  dampen_by,
-                 feature_eng):
+                 feature_eng,
+                 adam_update=True):
         '''
         Constructor
         '''
@@ -42,10 +43,13 @@ class MultiPolynomialRegression(ValueFunction):
         self.batch_size = batch_size
         self.max_iterations = max_iterations
         self.feature_eng = feature_eng
+        self.adam_update = adam_update
+        
         self.num_actions = feature_eng.num_actions()
 
         self.steps_history_sa = []
         self.steps_history_target = []
+        self.is_updated = False
         
         self.W = feature_eng.initial_W()
 
@@ -60,6 +64,12 @@ class MultiPolynomialRegression(ValueFunction):
         self.sample_W_ids = np.random.choice(self.W.shape[0], size=30)
         self.stat_epoch_cost = []
         self.stat_epoch_cost_x = []
+        
+        self.iteration = 0
+        
+        if self.adam_update:
+            self.first_moment = 0
+            self.second_moment = 0
 
     def prefix(self):
         return 'multipoly_a%s_r%s_b%d_i%d_d%0.4f_F%s' % (self.alpha, 
@@ -88,8 +98,20 @@ class MultiPolynomialRegression(ValueFunction):
 
     def record(self, state, action, target):
         ''' Record incoming data for later training '''
-        self.steps_history_sa.append((*state, *action))
-        self.steps_history_target.append(target)
+        
+        if self.is_updated:
+            # Forget old steps history
+            self.steps_history_sa = []
+            self.steps_history_target = []
+            self.is_updated = False
+
+        l = len(self.steps_history_sa)
+        
+        if l <= 350000:
+            self.steps_history_sa.append((*state, *action))
+            self.steps_history_target.append(target)
+            if l == 350000:
+                self.logger.debug("========== Enough recorded! ==============")
         
     def store_training_data(self, fname):
         SHSA = np.asarray(self.steps_history_sa)
@@ -107,19 +129,26 @@ class MultiPolynomialRegression(ValueFunction):
 
         self.train()
         self.test()
+        
+        self.is_updated = True
 
     def train(self):
         # Split up the training data by action
         start_time = time.clock()
         steps_history_x = [[] for _ in range(self.num_actions)]
         steps_history_t = [[] for _ in range(self.num_actions)]
-        for sa, t in zip(self.steps_history_sa,
-                         self.steps_history_target):
+        self.logger.debug("Preparing training data for %d items",
+                          len(self.steps_history_sa))
+        for i, (sa, t) in enumerate(zip(self.steps_history_sa,
+                         self.steps_history_target)):
             (j, l, s, d, st, ac) = sa
             ai = self.feature_eng.a_index((st, ac))
             x = self.feature_eng.x_adjust(j, l, s, d)
             steps_history_x[ai].append(x)
             steps_history_t[ai].append(t)
+            if (i+1) % 10000 == 0:
+                self.logger.debug("  prepared %d", i+1)
+
         self.logger.debug("Prepared training data (%0.2fs)",
                           time.clock() - start_time)
 
@@ -127,6 +156,7 @@ class MultiPolynomialRegression(ValueFunction):
         sWcollect = None
         epoch_shx = []
         epoch_sht = []
+        before_unique = after_unique = 0
         for ai in range(self.num_actions):
             SHX = np.asarray(steps_history_x[ai])
             SHT = np.asarray(steps_history_t[ai])
@@ -138,24 +168,33 @@ class MultiPolynomialRegression(ValueFunction):
             self.stat_error_cost[ai].extend(stat_err)
             self.stat_reg_cost[ai].extend(stat_reg)
             
-            # Sample dataset for later testing
-            SHX_test, u_ids = np.unique(SHX, axis=0, return_index=True)
-            SHT_test = SHT[u_ids]
+            # ---- Sample dataset for later testing
+            SHX_test, SHT_test = SHX, SHT
+            # Choose a smaller set before uniquifying
+            ids = np.random.choice(len(SHX_test), size=self.NUM_TEST_SAMPLES * 5)
+            SHX_test, SHT_test = SHX_test[ids], SHT_test[ids]
+            before_unique += SHX_test.shape[0]
+            # Collect unique input-features
+            SHX_test, ids = np.unique(SHX_test, axis=0, return_index=True)
+            SHT_test = SHT_test[ids]
+            after_unique += SHX_test.shape[0]
+            # Choose NUM_TEST_SAMPLES rows
             ids = np.random.choice(len(SHX_test), size=self.NUM_TEST_SAMPLES)
-            epoch_shx.append(SHX_test[ids])
-            epoch_sht.append(SHT_test[ids])
+            SHX_test, SHT_test = SHX_test[ids], SHT_test[ids]
+            epoch_shx.append(SHX_test)
+            epoch_sht.append(SHT_test)
             
             # stats
             sW = np.asarray(stat_W)  # n * mx
             sW = sW[:, self.sample_W_ids]
             sWcollect = sW if sWcollect is None else np.concatenate(
                 [sWcollect, sW], axis=1) # n * (mx * ma)
-            
-        self.stat_W.extend(list(sWcollect))
 
-        # Forget old steps history
-        self.steps_history_sa = []
-        self.steps_history_target = []
+            
+        self.alpha *= (1 - self.dampen_by)
+
+        self.stat_W.extend(list(sWcollect))
+        self.logger.debug("Percentage of uniques: %d%%", 100 * after_unique / before_unique)
 
         # Save sampled dataset for future testing purposes
         self.epoch_steps_history_shx.append(epoch_shx)
@@ -180,29 +219,53 @@ class MultiPolynomialRegression(ValueFunction):
         stat_reg_cost = []
         stat_W = []
         
+        alpha = self.alpha
+        
         for i in range(self.max_iterations):
-            if self.batch_size == 0:
-                # Do full-batch
-                X = SHX   # N x d
-                Y = SHT   # N
+            self.iteration += 1
+            #self.logger.debug("  Iteration %d", i)
+            if N > 0:
+                if self.batch_size == 0:
+                    # Do full-batch
+                    X = SHX   # N x d
+                    Y = SHT   # N
+                else:
+                    ids = np.random.choice(N, size=self.batch_size)
+                    X = SHX[ids]   # b x d
+                    Y = SHT[ids]   # b
+                V = np.dot(X, W) # b
+                D = V - Y # b
+                
+                # Calculate cost
+                error_cost = 0.5 * np.mean(D**2)
+                reg_cost = 0.5 * self.regularization_param * np.sum(W ** 2)
+                
+                # Find derivative
+                dW = -np.mean(D[:, np.newaxis] * X, axis=0)
+                dW -= self.regularization_param * W
+    
+                
+                # Update W
+                
+                if self.adam_update:
+                    beta1 = 0.9
+                    beta2 = 0.999
+                    eps = 1e-8
+                    
+                    self.first_moment = beta1 * self.first_moment + (1-beta1) * dW
+                    mt = self.first_moment / (1 - beta1 ** self.iteration)
+                    self.second_moment = beta2 * self.second_moment + (1-beta2) * (dW ** 2)
+                    vt = self.second_moment / (1 - beta2 ** self.iteration)
+                
+                    W += alpha * mt / (np.sqrt(vt) + eps)
+                else:
+                    W += alpha * dW
             else:
-                ids = np.random.choice(N, size=self.batch_size)
-                X = SHX[ids]   # b x d
-                Y = SHT[ids]   # b
-            V = np.dot(X, W) # b
-            D = V - Y # b
-            
-            # Calculate cost
-            error_cost = 0.5 * np.mean(D**2)
-            reg_cost = 0.5 * self.regularization_param * np.sum(W ** 2)
-            
-            # Find derivative
-            dW = -np.mean(D[:, np.newaxis] * X, axis=0)
-            dW -= self.regularization_param * W
-            
-            # Update W
-            W += self.alpha * dW
-            
+                error_cost = 0
+                reg_cost = 0
+
+            #self.logger.debug("    Updated W by %0.2f",  np.sum(dW**2))
+                         
             # Stats
             sum_error_cost += error_cost
             sum_reg_cost += reg_cost
@@ -214,9 +277,9 @@ class MultiPolynomialRegression(ValueFunction):
                 stat_W.append(sum_W / period)
 
 #                 if (i+1) % (20*period) == 0:
-#                     #self.logger.debug("Error: %0.2f \t dW:%0.2f\t W: %0.2f",
-#                     #                  error_cost, np.sum(dW**2),
-#                     #                  np.sum(W**2))
+#                     self.logger.debug("Error: %0.2f \t dW:%0.2f\t W: %0.2f",
+#                                       error_cost, np.sum(dW**2),
+#                                       np.sum(W**2))
 #                     if prev_sum_error_cost_trend > 0:
 #                         self.logger.debug("Progressive error cost: %0.2f",
 #                                           sum_error_cost_trend / prev_sum_error_cost_trend)
@@ -225,12 +288,15 @@ class MultiPolynomialRegression(ValueFunction):
 #                         #    break
 #                     prev_sum_error_cost_trend = sum_error_cost_trend
 #                     sum_error_cost_trend = 0
-#                 
+#                  
 #                 sum_error_cost_trend += sum_error_cost / period
 
                 sum_error_cost = 0
                 sum_reg_cost = 0
                 sum_W = 0
+
+            # TODO: remove
+            alpha *= (1 - self.dampen_by)
 
         debug_diff_W = (debug_start_W - W)
         self.logger.debug("  trained \tN=%s \tW+=%0.2f \tE=%0.2f", N,
@@ -255,8 +321,6 @@ class MultiPolynomialRegression(ValueFunction):
                     jerr = error_cost[jid].mean()
                     self.logger.debug("\t mean cost at juncture %2d : %0.2f",
                                       i, jerr)
-
-        self.alpha *= (1 - self.dampen_by)
 
         return W, stat_error_cost, stat_reg_cost, stat_W
         

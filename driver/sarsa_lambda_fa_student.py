@@ -145,7 +145,6 @@ class SarsaLambdaFAStudent(Driver):
         self.num_resets += 1
     
     def update_fa(self):
-        self.fa.store_training_data("student_train")
         self.fa.update()
 
     def collect_stats(self, ep, num_episodes):

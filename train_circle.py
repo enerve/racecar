@@ -246,7 +246,7 @@ def main():
     # QLookup 4-explored 8000 episode QLambda-updated Qlookup 
     #trainer.load_from_file("439945_RC circle_DR_q_lambda_76_0.35_Qtable_a0.7_T_poly_a0.01_r0.002_b256_i50000_3ttt__")
 
-    trainer.train(10, 500, 25)
+    trainer.train(10, 500, 5)
 
 #     driver.mimic_fa = False
 #     trainer.train(1, 8000, 3)
@@ -271,9 +271,9 @@ def main():
 
     if driver.mimic_fa:
         t_R, b_E, _ = driver.run_best_episode(track, car, True)
-        logger.debug("TestDriver best episode total R = %0.2f time=%d", t_R,
+        logger.debug("Mimic best episode total R = %0.2f time=%d", t_R,
                      b_E.total_time_taken())
-        b_E.play_movie(pref="bestmovie_testfa")
+        b_E.play_movie(pref="bestmovie_mimic")
 
     if student:
         t_R, b_E, _ = student.run_best_episode(track, car)

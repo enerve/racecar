@@ -105,6 +105,8 @@ class Driver(object):
 
     def save_model(self, pref=""):
         self.fa.save_model(pref)
+        if self.mimic_fa:
+            self.mimic_fa.save_model(pref+"_mimic")
 
     def load_model(self, load_subdir, pref=""):
         self.fa.load_model(load_subdir, pref)
