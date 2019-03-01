@@ -173,7 +173,7 @@ class LineTrack(Track):
         return x**2 + y**2 <= radius**2
 
     @lru_cache(maxsize=None)
-    def draw_matrix(self, draw_lanes=False):
+    def draw_matrix(self, draw_junctures=False):
         W, H = self.W, self.H
         A = np.zeros((H, W))
         
@@ -196,7 +196,7 @@ class LineTrack(Track):
         A2 = (A.T + A2.T).T
         A2 = A2 + (255 - 50)
 
-        if draw_lanes:
+        if draw_junctures:
             color = np.array([0, 150, 250])
             j_length = self.total_length / self.num_junctures
             progress = 0
@@ -214,9 +214,7 @@ class LineTrack(Track):
                     l -= 1
                     progress = self.lengths[l]
                     
-                x1, y1, x2, y2 = self.lines[l]
-                p1_ = np.array((x1, y1))
-                p2_ = np.array((x2, y2))
+                p1_, p2_ = self.lines[l]
                 line = p2_ - p1_
                 proj_ = p1_ + line * progress / self.lengths[l]
                 

@@ -120,6 +120,13 @@ def scatter(x, y, values, xlabel, ylabel, pref=None):
     save_plot(pref)
     plt.show()
 
+def hist(x, bins=10, range=None, title=None, pref=None):
+    plt.hist(x, bins, range)
+    if title:
+        plt.title(title, loc='center')
+    save_plot(pref)
+    plt.show()
+
 class Plotter:
     def __init__(self, title):
         self.title = title

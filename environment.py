@@ -72,6 +72,7 @@ class Environment(object):
 
         # Run physics until next juncture, collecting rewards along the way
         R = 0
+#         curr_line_id = self.track.line_id(self.track_anchor)
         while True:
             #self.logger.debug("  moving further inside")
             self.car.move()
@@ -100,6 +101,10 @@ class Environment(object):
                                               self.curr_juncture,
                                               next_juncture):
                 # Car location has moved beyond juncture
+#                 if self.track.line_id(self.track_anchor) != curr_line_id and \
+#                     self.curr_juncture > 33:
+#                     self.logger.debug("Line id changed after juncture %d",
+#                                       self.curr_juncture)
                 # TODO: what if it has actually moved backwards?
                 #self.logger.debug("juncture %d reached", next_juncture)
                 break

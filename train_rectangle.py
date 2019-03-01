@@ -9,7 +9,10 @@ import logging
 from car import Car
 from driver import *
 from track import LineTrack
-from trainer import Trainer
+from epoch_trainer import EpochTrainer
+from function import MultiPolynomialRegression
+from function import QLookup
+from rectangle_feature_eng import RectangleFeatureEng
 import cmd_line
 import log
 import util
@@ -19,14 +22,14 @@ import random
 def main():
     args = cmd_line.parse_args()
 
-    util.prefix_init(args)
+    util.init(args)
     util.pre_problem = 'RC rect'
 
     logger = logging.getLogger()
-    log.configure_logger(logger, "RaceCar FS rectangle")
+    log.configure_logger(logger, "RaceCar")
     logger.setLevel(logging.DEBUG)
 
-    # --------------
+    # -------------- Configure track
     
     points = [
             (120, 40),
@@ -48,6 +51,8 @@ def main():
     track = LineTrack(points, WIDTH, NUM_JUNCTURES, NUM_MILESTONES,
                       NUM_LANES)
     
+    #util.draw_image(track.draw())
+    
     car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
     
     logger.debug("*Problem:\t%s", util.pre_problem)
@@ -62,39 +67,10 @@ def main():
     seed = 123
     random.seed(seed)
     np.random.seed(seed)
-    
-#     driver = QDriver(1, # alpha
-#                     1, # gamma
-#                     100, # explorate
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#     driver = QLambdaDriver(0.35, # lambda
-#                     0.7, # alpha
-#                     1, # gamma
-#                     76, # explorate
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#     driver = SarsaDriver(0.2, # alpha
-#                     1, # gamma
-#                     200, # explorate
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-    driver = SarsaLambdaDriver(0.9, # lambda
-                    0.2, # alpha
-                    1, # gamma
-                    200, # explorate
+
+    # ------------------ Guide driver FA -----------------
+
+    driver_fa = QLookup(0.2,  # alpha
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
@@ -102,16 +78,133 @@ def main():
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
 
-    trainer = Trainer(driver, track, car)
-      
-#     subdir = "463503_RC rect_q_lambda_100_0.8_1.0_0.9_"
-#     driver.load_model(subdir)
-#     trainer.load_stats(subdir)
-    trainer.train(50 * 1000)
-      
-    trainer.report_stats()
-    trainer.play_best()
+#     driver_fe = RectangleFeatureEng(
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+# 
+#     driver_fa = MultiPolynomialRegression(
+#                     0.002, # alpha ... #4e-5 old alpha without batching
+#                     0.005, # regularization constant
+#                     256, # batch_size
+#                     1000, # max_iterations
+#                     0.000, # dampen_by
+#                     driver_)
 
+    # ------------------ Mimic FA -----------------
+    mimic_fa = None
+
+    mimic_fe = RectangleFeatureEng(
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS)
+ 
+    mimic_fa = MultiPolynomialRegression(
+                    10.0, # alpha ... #4e-5 old alpha without batching
+                    0.0001, # regularization constant
+                    512, # batch_size
+                    3000, # max_iterations
+                    0.001, # dampen_by
+                    mimic_fe)
+     
+    # ------------------ Guide driver RL algorithm ---------------
+
+    driver = QLambdaFADriver(
+                    0.8, #lambda
+                    1, # gamma
+                    200, # explorate
+                    driver_fa,
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS,
+                    mimic_fa)
+
+
+    # ------------------ Student driver FA -----------------
+
+#     student_fe = RectangleFeatureEng(
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+# 
+#     student_fa = MultiPolynomialRegression(
+#                     0.00001, # alpha ... #4e-5 old alpha without batching
+#                     0.005, # regularization constant
+#                     256, # batch_size
+#                     100, # max_iterations
+#                     0.000, # dampen_by
+#                     student_fe)
+    
+    # ------------------ Student driver RL algorithm -------------
+    student = None
+
+#     student = QLambdaFAStudent(
+#                     0.8, #lambda
+#                     1, # gamma
+#                     student_fa,
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS,
+#                     None)
+    
+    
+    
+    # ------------------ Training -------------------
+
+    #trainer = Trainer(driver, track, car)
+    trainer = EpochTrainer(driver, track, car, student)
+    
+    #subdir = "215973_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2_M_multipoly_a0.002_r0.005_b256_i200_d0.0000_F3tftt__"
+    # 100 x 500 x 10 trained on top of above
+    #subdir = "224148_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2__ST_q_lambda_l0.80_multipoly_a1e-05_r0.005_b256_i100_d0.0000_F3tftt__"
+    #driver.load_model(subdir)
+#     trainer.load_stats(subdir)
+#     trainer.train(1, 20000, 1)
+#     trainer.save_to_file()
+    #mimic_fa.store_training_data("mimic")
+
+#     trainer.report_stats()
+    
+    # Load poly training data and train
+    # 20000 episodes worth of training data, built upon 100 x 500 x 10 pretrain
+    subdir = "311066_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2_M_multipoly_a0.0002_r0.005_b256_i100_d0.0000_F3tftt__"
+    mimic_fa.load_training_data("mimic", subdir)
+    #mimic_fa.describe_training_data()
+    mimic_fa.train()
+    mimic_fa.test()
+    mimic_fa.report_stats()
+
+    t_R, b_E, _ = driver.run_best_episode(track, car, False)
+    logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
+                 b_E.total_time_taken())
+#     b_E.play_movie(pref="bestmovie")
+
+    if driver.mimic_fa:
+        t_R, b_E, _ = driver.run_best_episode(track, car, True)
+        logger.debug("Mimic best episode total R = %0.2f time=%d", t_R,
+                     b_E.total_time_taken())
+        b_E.play_movie(pref="bestmovie_mimic")
+
+    if student:
+        t_R, b_E, _ = student.run_best_episode(track, car)
+        logger.debug("Student best episode total R = %0.2f time=%d", t_R,
+                 b_E.total_time_taken())
+        b_E.play_movie(pref="bestmovie_student")
 
     # --------- CV ---------
     lambdas = []

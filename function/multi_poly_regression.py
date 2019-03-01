@@ -123,10 +123,8 @@ class MultiPolynomialRegression(ValueFunction):
         util.dump(SHT, fname, "t")
 
     def load_training_data(self, fname, subdir):
-        self.steps_history_sa = torch.from_numpy(
-            util.load(fname, subdir, suffix="SA")).to(self.device)
-        self.steps_history_target = torch.from_numpy(
-            util.load(fname, subdir, suffix="t")).to(self.device)
+        self.steps_history_sa = util.load(fname, subdir, suffix="SA").tolist()
+        self.steps_history_target = util.load(fname, subdir, suffix="t").tolist()
 
     def update(self):
         ''' Updates the value function model based on data collected since
@@ -149,6 +147,11 @@ class MultiPolynomialRegression(ValueFunction):
                           len(self.steps_history_sa))
         for i, (sa, t) in enumerate(zip(self.steps_history_sa,
                          self.steps_history_target)):
+            #if (i+1) < 250000:
+            #    continue
+            #if (i+1) >= 50000:
+            #    break
+            
             (j, l, s, d, st, ac) = sa
             ai = self.feature_eng.a_index((st, ac))
             x = self.feature_eng.x_adjust(j, l, s, d)
@@ -187,7 +190,23 @@ class MultiPolynomialRegression(ValueFunction):
             before_unique += SHX_test.shape[0]
             # Collect unique input-features
             # TODO: unique is kinda slow. Avoid it.
-            SHX_test, ids = torch.unique(SHX_test, dim=0, return_inverse=True)
+            dedup_SHX_test, ids = torch.unique(SHX_test, dim=0, return_inverse=True)
+            if True:
+                # To help debug how stable/consistent the dataset is,
+                # plot how target values are distributed for a given input
+                n_dedup_SHX_test = dedup_SHX_test.numpy()
+                n_SHX_test = SHX_test.numpy()
+                n_SHT_test = SHT_test.numpy()
+                h = []
+                for row in n_dedup_SHX_test:
+                    match_ids = np.all(n_SHX_test == row, axis=1)
+                    T = n_SHT_test[match_ids]
+                    T -= T.mean()
+                    h.extend(T.tolist())
+                util.hist(h, 100, range=(-50,50), title="ai %s" % ai, pref="ai%d"%ai)
+                #util.hist(h, 100, range=(0.5,1.5), title="ai %s" % ai, pref="ai%d"%ai)
+            
+            SHX_test = dedup_SHX_test
             SHT_test = SHT_test[ids]
             after_unique += SHX_test.shape[0]
             # Choose NUM_TEST_SAMPLES rows
@@ -336,6 +355,13 @@ class MultiPolynomialRegression(ValueFunction):
                     self.logger.debug("\t mean cost at juncture %2d : %0.2f",
                                       i, jerr)
 
+#             import pandas as pd
+#             dfX = pd.DataFrame(X.cpu().numpy())
+#             dfY = pd.DataFrame(Y.cpu().numpy(), columns = ["target"])
+#             df = pd.concat([dfX, dfY], axis=1)
+#             df = df.groupby(["juncture", "lane"]).mean()
+#             self.logger.debug("  Mean df: \n%s", df)
+            
         return W, stat_error_cost, stat_reg_cost, stat_W
         
     def test(self):
