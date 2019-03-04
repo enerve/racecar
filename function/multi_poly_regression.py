@@ -191,7 +191,7 @@ class MultiPolynomialRegression(ValueFunction):
             # Collect unique input-features
             # TODO: unique is kinda slow. Avoid it.
             dedup_SHX_test, ids = torch.unique(SHX_test, dim=0, return_inverse=True)
-            if True:
+            if False:
                 # To help debug how stable/consistent the dataset is,
                 # plot how target values are distributed for a given input
                 n_dedup_SHX_test = dedup_SHX_test.numpy()
@@ -224,6 +224,7 @@ class MultiPolynomialRegression(ValueFunction):
 
             
         self.alpha *= (1 - self.dampen_by)
+        self.iteration += self.max_iterations
 
         self.stat_W.extend(list(sWcollect))
         self.logger.debug("Percentage of uniques: %d%%", 100 * after_unique / before_unique)
@@ -253,9 +254,10 @@ class MultiPolynomialRegression(ValueFunction):
         
         # TODO: decay alpha over the epochs too
         alpha = self.alpha
+        iteration = self.iteration
         
         for i in range(self.max_iterations):
-            self.iteration += 1
+            iteration += 1
             #self.logger.debug("  Iteration %d", i)
             if N > 0:
                 if self.batch_size == 0:
@@ -287,9 +289,9 @@ class MultiPolynomialRegression(ValueFunction):
                     eps = 1e-8
                     
                     self.first_moment = beta1 * self.first_moment + (1-beta1) * dW
-                    mt = self.first_moment / (1 - beta1 ** self.iteration)
+                    mt = self.first_moment / (1 - beta1 ** iteration)
                     self.second_moment = beta2 * self.second_moment + (1-beta2) * (dW ** 2)
-                    vt = self.second_moment / (1 - beta2 ** self.iteration)
+                    vt = self.second_moment / (1 - beta2 ** iteration)
                 
                     W += alpha * mt / (torch.sqrt(vt) + eps)
                 else:

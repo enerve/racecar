@@ -12,6 +12,7 @@ from track import LineTrack
 from epoch_trainer import EpochTrainer
 from function import MultiPolynomialRegression
 from function import QLookup
+from function import NN_FA
 from rectangle_feature_eng import RectangleFeatureEng
 import cmd_line
 import log
@@ -96,8 +97,32 @@ def main():
 
     # ------------------ Mimic FA -----------------
     mimic_fa = None
-
-    mimic_fe = RectangleFeatureEng(
+ 
+#     mimic_fe = RectangleFeatureEng(
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS,
+#                     include_basis = True,
+#                     include_sin_cosine = True,
+#                     include_splines = True,
+#                     spline_length = 4,
+#                     include_corner_splines = True,
+#                     corners = [0, 4, 15, 33, 44, 49],
+#                     include_bounded_features = True,
+#                     poly_degree = 2)
+#   
+#     mimic_fa = MultiPolynomialRegression(
+#                     10.0, # alpha ... #4e-5 old alpha without batching
+#                     0.0001, # regularization constant
+#                     512, # batch_size
+#                     3000, # max_iterations
+#                     0.001, # dampen_by
+#                     mimic_fe)
+    
+    mimic_fe2 = RectangleFeatureEng(
                     NUM_JUNCTURES,
                     NUM_LANES,
                     NUM_SPEEDS,
@@ -105,13 +130,12 @@ def main():
                     NUM_STEER_POSITIONS,
                     NUM_ACCEL_POSITIONS)
  
-    mimic_fa = MultiPolynomialRegression(
-                    10.0, # alpha ... #4e-5 old alpha without batching
-                    0.0001, # regularization constant
+    mimic_fa = NN_FA(
+                    0.000001, # alpha ... #4e-5 old alpha without batching
+                    1, # regularization constant
                     512, # batch_size
-                    3000, # max_iterations
-                    0.001, # dampen_by
-                    mimic_fe)
+                    2000, # max_iterations
+                    mimic_fe2)
      
     # ------------------ Guide driver RL algorithm ---------------
 
@@ -187,7 +211,7 @@ def main():
     #mimic_fa.describe_training_data()
     mimic_fa.train()
     mimic_fa.test()
-    mimic_fa.report_stats()
+    mimic_fa.report_stats("mimic")
 
     t_R, b_E, _ = driver.run_best_episode(track, car, False)
     logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
