@@ -13,22 +13,8 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-logger = logging.getLogger(__name__)
-
-def init_logger():
-    #logger.setLevel(logging.INFO)
-    logger.info("Starting at %s", datetime.datetime.now())
-    pass
 
 use_gpu = False
-
-def init_gpu(args):
-    global use_gpu
-    if args.gpu and torch.cuda.is_available:
-        print("Cuda is available, using GPU as requested")
-        use_gpu = True
-
-# ------ Drawing ---------
 
 pre_outputdir = None
 pre_problem = None
@@ -46,7 +32,20 @@ def init(args):
 
     init_gpu(args)
 
+def init_gpu(args):
+    global use_gpu
+    if args.gpu and torch.cuda.is_available:
+        use_gpu = True
+
+def init_logger():
+    global logger
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
     logging.getLogger("matplotlib").setLevel(logging.INFO)
+
+    logger.debug("Starting at %s", datetime.datetime.now())
+    if use_gpu:
+        logger.debug("Cuda is available, using GPU as requested")
 
 def prefix(other_tym=None):
     alg = ''
@@ -62,6 +61,9 @@ def prefix(other_tym=None):
         
 def subdir(other_tym=None):
     return prefix(other_tym) + "/"
+
+
+# ------ Drawing ---------
 
 def save_plot(pref=None):
     fname = prefix() \
