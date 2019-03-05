@@ -7,7 +7,7 @@ Created on Sep 10, 2018
 import logging
 import numpy as np
 import os
-import time
+import time, datetime
 import torch
 
 import matplotlib.pyplot as plt
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 def init_logger():
     #logger.setLevel(logging.INFO)
+    logger.info("Starting at %s", datetime.datetime.now())
     pass
 
 use_gpu = False

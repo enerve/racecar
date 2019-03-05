@@ -11,5 +11,5 @@ def parse_args():
     parser.add_argument('--output_dir', help='path to store output files')
     parser.add_argument('--bin', help='path to libraries such as ffmpeg')
     parser.add_argument('--nn', action='store_true')
-    parser.add_argument('--gpu', action='store_true')
+    parser.add_argument('--gpu', action='store_false')  # i.e. default True
     return parser.parse_args()

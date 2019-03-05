@@ -49,7 +49,7 @@ class NN_FA(ValueFunction):
 
         self.num_outputs = feature_eng.num_actions()
         
-        self.net = Net(4, 1000, self.num_outputs)
+        self.net = Net(4, 2000, self.num_outputs).cuda(self.device)
         self.criterion = nn.MSELoss(reduce=False)
         self.optimizer = optim.SGD(
             self.net.parameters(),
@@ -160,10 +160,10 @@ class NN_FA(ValueFunction):
         if period > self.max_iterations:
             self.logger.warning("max_iterations too small for period plotting")
 
-        sum_error_cost = torch.zeros(self.num_outputs)
+        sum_error_cost = torch.zeros(self.num_outputs).to(self.device)
         sum_error_cost.detach()
         sum_error_cost_trend = prev_sum_error_cost_trend = 0
-        sum_reg_cost = torch.zeros(self.num_outputs)
+        sum_reg_cost = torch.zeros(self.num_outputs).to(self.device)
 #         sum_W = 0
 #         debug_start_W = W.clone().detach()
         
@@ -195,7 +195,8 @@ class NN_FA(ValueFunction):
                 # Zero-out the computed losses for the other actions/outputs
                 loss *= M   # b x do
             # backward
-            loss.backward(torch.ones(loss.shape))
+            onez = torch.ones(loss.shape).to(self.device)
+            loss.backward(onez)
             # loss.backward(M)
             
             # updated weights
@@ -205,11 +206,11 @@ class NN_FA(ValueFunction):
             sum_error_cost += torch.mean(loss.detach(), 0)  # do
             #sum_W += W
             if (i+1) % period == 0:
-                stat_error_cost.append(sum_error_cost.detach().numpy() / period)
-                stat_reg_cost.append(sum_reg_cost.detach().numpy() / period)
+                stat_error_cost.append(sum_error_cost.detach().cpu().numpy() / period)
+                stat_reg_cost.append(sum_reg_cost.detach().cpu().numpy() / period)
                 #stat_W.append(sum_W / period)
 
-                self.logger.debug("  loss=%0.2f", sum_error_cost.mean().item())
+                #self.logger.debug("  loss=%0.2f", sum_error_cost.mean().item())
 
 #                 if (i+1) % (20*period) == 0:
 #                     self.logger.debug("Error: %0.2f \t dW:%0.2f\t W: %0.2f",
@@ -226,8 +227,8 @@ class NN_FA(ValueFunction):
 #                  
 #                 sum_error_cost_trend += sum_error_cost / period
 
-                sum_error_cost = torch.zeros(self.num_outputs)
-                sum_reg_cost = torch.zeros(self.num_outputs)
+                sum_error_cost = torch.zeros(self.num_outputs).to(self.device)
+                sum_reg_cost = torch.zeros(self.num_outputs).to(self.device)
                 sum_W = 0
 
         self.logger.debug("  trained \tN=%s \tE=%0.2f", N,
