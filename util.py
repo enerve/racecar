@@ -79,7 +79,16 @@ def heatmap(P, extent, title=None, cmap='hot', pref=None):
     save_plot(pref)
     plt.show()
 
-def plot(lines, x, labels=None, title=None, pref=None, ylim=None):
+def start_interactive():
+    plt.ion()
+
+def stop_interactive():
+    plt.ioff()
+    plt.cla()
+
+def plot(lines, x, labels=None, title=None, pref=None, ylim=None, live=False):
+    if live:
+        plt.cla()
     for i in range(len(lines)):
         l = lines[i]
         if labels:
@@ -92,8 +101,12 @@ def plot(lines, x, labels=None, title=None, pref=None, ylim=None):
         plt.title(title, loc='center')
     if ylim:
         plt.ylim(ylim)
-    save_plot(pref)
-    plt.show()
+    if live:
+        plt.draw()
+        plt.pause(0.2)
+    else:
+        save_plot(pref)
+        plt.show()
 
 def plot_all(lines, xs, labels=None, title=None, pref=None, ylim=None):
     for i in range(len(lines)):

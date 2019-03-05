@@ -122,20 +122,20 @@ def main():
 #                     0.001, # dampen_by
 #                     mimic_fe)
     
-    mimic_fe2 = RectangleFeatureEng(
-                    NUM_JUNCTURES,
-                    NUM_LANES,
-                    NUM_SPEEDS,
-                    NUM_DIRECTIONS,
-                    NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS)
- 
-    mimic_fa = NN_FA(
-                    0.000001, # alpha ... #4e-5 old alpha without batching
-                    1, # regularization constant
-                    512, # batch_size
-                    2000, # max_iterations
-                    mimic_fe2)
+#     mimic_fe2 = RectangleFeatureEng(
+#                     NUM_JUNCTURES,
+#                     NUM_LANES,
+#                     NUM_SPEEDS,
+#                     NUM_DIRECTIONS,
+#                     NUM_STEER_POSITIONS,
+#                     NUM_ACCEL_POSITIONS)
+#  
+#     mimic_fa = NN_FA(
+#                     0.000001, # alpha ... #4e-5 old alpha without batching
+#                     1, # regularization constant
+#                     512, # batch_size
+#                     200, # max_iterations
+#                     mimic_fe2)
      
     # ------------------ Guide driver RL algorithm ---------------
 
@@ -170,48 +170,69 @@ def main():
 #                     100, # max_iterations
 #                     0.000, # dampen_by
 #                     student_fe)
+
+    student_fe2 = RectangleFeatureEng(
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS)
+ 
+    student_fa = NN_FA(
+                    0.000001, # alpha ... #4e-5 old alpha without batching
+                    1, # regularization constant
+                    512, # batch_size
+                    2000, # max_iterations
+                    student_fe2)
     
     # ------------------ Student driver RL algorithm -------------
     student = None
-
-#     student = QLambdaFAStudent(
-#                     0.8, #lambda
-#                     1, # gamma
-#                     student_fa,
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS,
-#                     None)
+# 
+    student = QLambdaFAStudent(
+                    0.8, #lambda
+                    1, # gamma
+                    student_fa,
+                    NUM_JUNCTURES,
+                    NUM_LANES,
+                    NUM_SPEEDS,
+                    NUM_DIRECTIONS,
+                    NUM_STEER_POSITIONS,
+                    NUM_ACCEL_POSITIONS,
+                    None)
     
     
     
     # ------------------ Training -------------------
+    
+    util.start_interactive()
 
     #trainer = Trainer(driver, track, car)
     trainer = EpochTrainer(driver, track, car, student)
     
     #subdir = "215973_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2_M_multipoly_a0.002_r0.005_b256_i200_d0.0000_F3tftt__"
     # 100 x 500 x 10 trained on top of above
-    #subdir = "224148_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2__ST_q_lambda_l0.80_multipoly_a1e-05_r0.005_b256_i100_d0.0000_F3tftt__"
-    #driver.load_model(subdir)
-#     trainer.load_stats(subdir)
-#     trainer.train(1, 20000, 1)
-#     trainer.save_to_file()
+    # subdir = "224148_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2__ST_q_lambda_l0.80_multipoly_a1e-05_r0.005_b256_i100_d0.0000_F3tftt__"
+    # driver.load_model(subdir)
+    #trainer.load_stats(subdir)
+    
+    #trainer.train(100, 500, 1)
+    trainer.train(10, 2000, 2)
+    trainer.save_to_file()
     #mimic_fa.store_training_data("mimic")
+    util.stop_interactive()
 
 #     trainer.report_stats()
     
-    # Load poly training data and train
-    # 20000 episodes worth of training data, built upon 100 x 500 x 10 pretrain
-    subdir = "311066_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2_M_multipoly_a0.0002_r0.005_b256_i100_d0.0000_F3tftt__"
-    mimic_fa.load_training_data("mimic", subdir)
-    #mimic_fa.describe_training_data()
-    mimic_fa.train()
-    mimic_fa.test()
-    mimic_fa.report_stats("mimic")
+#     # Load poly training data and train
+#     # 20000 episodes worth of training data, built upon 100 x 500 x 10 pretrain
+#     subdir = "311066_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2_M_multipoly_a0.0002_r0.005_b256_i100_d0.0000_F3tftt__"
+#     mimic_fa.load_training_data("mimic", subdir)
+#     #mimic_fa.describe_training_data()
+#     mimic_fa.train()
+#     mimic_fa.test()
+#     mimic_fa.report_stats("mimic")
+
 
     t_R, b_E, _ = driver.run_best_episode(track, car, False)
     logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
@@ -226,6 +247,7 @@ def main():
 
     if student:
         t_R, b_E, _ = student.run_best_episode(track, car)
+        student_fa.report_stats("student")
         logger.debug("Student best episode total R = %0.2f time=%d", t_R,
                  b_E.total_time_taken())
         b_E.play_movie(pref="bestmovie_student")

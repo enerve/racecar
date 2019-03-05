@@ -273,6 +273,14 @@ class NN_FA(ValueFunction):
                   pref=pref+"cost",
                   ylim=None)
     
+    def live_stats(self):
+        n_cost = np.asarray(self.stat_error_cost).T
+        util.plot(n_cost,
+                  range(n_cost.shape[1]),
+                  labels = range(n_cost.shape[1]),
+                  title = "NN training cost",
+                  live=True)
+
     def save_model(self, pref=""):
         pass
 

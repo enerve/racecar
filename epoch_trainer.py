@@ -149,6 +149,7 @@ class EpochTrainer:
                         self.student.collect_stats(ep_s, total_episodes)
                         ep_s += 1
                     self.student.update_fa()
+                    self.student.live_stats()
             
             self.driver.restart_exploration(1) #(1.5)
 

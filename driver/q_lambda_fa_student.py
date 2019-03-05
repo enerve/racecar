@@ -165,3 +165,6 @@ class QLambdaFAStudent(Driver):
                   ["Avg ΔQ student fa"], pref=pref+"delta",
                   ylim=None)
         self.fa.report_stats(pref)
+
+    def live_stats(self):
+        self.fa.live_stats()
