@@ -69,16 +69,19 @@ class NN_FA(ValueFunction):
                                      self.feature_eng.prefix(),
                                      self.net.prefix())
 
-    def value(self, state, action):
+    def _value(self, state):
         X = self.feature_eng.x_adjust(*state)
+        with torch.no_grad():
+            output = self.net(X)
+        return output
+        
+    def value(self, state, action):
+        output = self._value(state)
         ai = self.feature_eng.a_index(action)
-        output = self.net.forward(X)
         return output[ai]
 
     def best_action(self, state):
-        X = self.feature_eng.x_adjust(*state)
-        V = self.net.forward(X)
-
+        V = self._value(state)
         i = torch.argmax(V).item()
         return self.feature_eng.a_tuple(i)
 
@@ -203,7 +206,7 @@ class NN_FA(ValueFunction):
             self.optimizer.step()
             
             # Stats
-            sum_error_cost += torch.mean(loss.detach(), 0)  # do
+            sum_error_cost.add_(torch.mean(loss.detach(), 0))  # do
             #sum_W += W
             if (i+1) % period == 0:
                 stat_error_cost.append(sum_error_cost.detach().cpu().numpy() / period)
@@ -227,8 +230,8 @@ class NN_FA(ValueFunction):
 #                  
 #                 sum_error_cost_trend += sum_error_cost / period
 
-                sum_error_cost = torch.zeros(self.num_outputs).to(self.device)
-                sum_reg_cost = torch.zeros(self.num_outputs).to(self.device)
+                torch.zeros(self.num_outputs, out=sum_error_cost)
+                torch.zeros(self.num_outputs, out=sum_reg_cost)
                 sum_W = 0
 
         self.logger.debug("  trained \tN=%s \tE=%0.2f", N,
