@@ -17,27 +17,19 @@ class QLambdaFADriver(Driver):
     An agent that learns to drive a car along a track, optimizing using Q(λ)
     '''
 
-    def __init__(self, lam, gamma, explorate,
+    def __init__(self, config,
+                 lam,
+                 gamma,
+                 explorate,
                  fa,
-                 num_junctures,
-                 num_lanes,
-                 num_speeds,
-                 num_directions,
-                 num_steer_positions,
-                 num_accel_positions,
                  mimic_fa):
         '''
         Constructor
         fa is the value function approximator that guides the episodes and
             learns on the job, using the Q algorithm
         '''
-        super().__init__(fa,
-                         num_junctures,
-                         num_lanes,
-                         num_speeds,
-                         num_directions,
-                         num_steer_positions,
-                         num_accel_positions,
+        super().__init__(config,
+                         fa,
                          mimic_fa)
         
         self.logger = logging.getLogger(__name__)
@@ -53,9 +45,9 @@ class QLambdaFADriver(Driver):
             self.avg_delta2 = 0
             self.stat_dlm2 = []
 
-        self.eligible_mult = [(lam * gamma) ** i for i in range(num_junctures)]
-        self.eligible_states = [None for i in range(num_junctures)]
-        self.eligible_state_target = [0 for i in range(num_junctures)]
+        self.eligible_mult = [(lam * gamma) ** i for i in range(self.num_junctures)]
+        self.eligible_states = [None for i in range(self.num_junctures)]
+        self.eligible_state_target = [0 for i in range(self.num_junctures)]
         
         # TODO: move N to FA?
         # N is the count of visits to state
@@ -65,14 +57,14 @@ class QLambdaFADriver(Driver):
                            self.num_directions), dtype=np.int32)
                            
         # C is the count of visits to state/action
-        self.C = np.zeros((num_junctures,
-                           num_lanes,
-                           num_speeds,
-                           num_directions,
-                           num_steer_positions,
-                           num_accel_positions), dtype=np.int32)
+        self.C = np.zeros((self.num_junctures,
+                           self.num_lanes,
+                           self.num_speeds,
+                           self.num_directions,
+                           self.num_steer_positions,
+                           self.num_accel_positions), dtype=np.int32)
         # Rs is the average reward at juncture (for statistics)
-        self.Rs = np.zeros((num_junctures), dtype=np.float)
+        self.Rs = np.zeros((self.num_junctures), dtype=np.float)
         self.avg_delta = 0
         self.restarted = False
 
@@ -104,7 +96,7 @@ class QLambdaFADriver(Driver):
         self.num_steps = 0
 
     def prefix(self):
-        pref = "q_lambda_%d_%0.2f_" % (self.explorate, self.lam) + self.fa.prefix()
+        pref = "q_lambda_e%d_l%0.2f_" % (self.explorate, self.lam) + self.fa.prefix()
         if self.mimic_fa:
             pref += 'M_' + self.mimic_fa.prefix()
         return pref

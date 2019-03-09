@@ -15,13 +15,8 @@ class QLookup(ValueFunction):
     '''
 
     def __init__(self,
-                 alpha,
-                 num_junctures,
-                 num_lanes,
-                 num_speeds,
-                 num_directions,
-                 num_steer_positions,
-                 num_accel_positions):
+                 config,
+                 alpha):
         '''
         Constructor
         '''
@@ -30,12 +25,12 @@ class QLookup(ValueFunction):
         self.logger.setLevel(logging.DEBUG)
 
         # Q is the learned value of a state/action
-        self.Q = np.zeros((num_junctures,
-                           num_lanes,
-                           num_speeds,
-                           num_directions,
-                           num_steer_positions,
-                           num_accel_positions))
+        self.Q = np.zeros((config.NUM_JUNCTURES,
+                           config.NUM_LANES,
+                            config.NUM_SPEEDS,
+                            config.NUM_DIRECTIONS,
+                            config.NUM_STEER_POSITIONS,
+                            config.NUM_ACCEL_POSITIONS))
         
         self.alpha = alpha
         #self.episode_history = []

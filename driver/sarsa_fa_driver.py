@@ -18,14 +18,10 @@ class SarsaFADriver(Driver):
     Sarsa
     '''
 
-    def __init__(self, gamma, explorate,
+    def __init__(self, config,
+                 gamma,
+                 explorate,
                  fa,
-                 num_junctures,
-                 num_lanes,
-                 num_speeds,
-                 num_directions,
-                 num_steer_positions,
-                 num_accel_positions,
                  mimic_fa):
         '''
         Constructor
@@ -34,13 +30,8 @@ class SarsaFADriver(Driver):
         mimic_fa is a value function approximator that tries to learn from the
             guide driver, using the same algorithm.
         '''
-        super().__init__(fa,
-                         num_junctures,
-                         num_lanes,
-                         num_speeds,
-                         num_directions,
-                         num_steer_positions,
-                         num_accel_positions,
+        super().__init__(config,
+                         fa,
                          mimic_fa)
         
         self.logger = logging.getLogger(__name__)
@@ -61,14 +52,14 @@ class SarsaFADriver(Driver):
                            self.num_directions), dtype=np.int32)
                            
         # C is the count of visits to state/action
-        self.C = np.zeros((num_junctures,
-                           num_lanes,
-                           num_speeds,
-                           num_directions,
-                           num_steer_positions,
-                           num_accel_positions), dtype=np.int32)
+        self.C = np.zeros((self.num_junctures,
+                           self.num_lanes,
+                           self.num_speeds,
+                           self.num_directions,
+                           self.num_steer_positions,
+                           self.num_accel_positions), dtype=np.int32)
         # Rs is the average reward at juncture (for statistics)
-        self.Rs = np.zeros((num_junctures), dtype=np.float)
+        self.Rs = np.zeros((self.num_junctures), dtype=np.float)
         self.avg_delta = 0
         self.restarted = False
 

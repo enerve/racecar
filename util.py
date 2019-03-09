@@ -212,3 +212,15 @@ def load(fname, subdir=None, suffix=None):
         + ("_%s"%suffix if suffix else '') \
         + '.npy'
     return np.load(fname)
+
+def append(A, fname, subdir=None, suffix=None):
+    fname = pre_outputdir \
+        + ("%s/"%subdir if subdir else '') \
+        + fname \
+        + ("_%s"%suffix if suffix else '') \
+        + '.npy'
+    if os.path.isfile(fname):
+        A_old = np.load(fname)
+        logger.debug("%s", A_old)
+        A = np.concatenate((A_old, A), axis=0)
+    np.save(fname, A)

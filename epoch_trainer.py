@@ -51,8 +51,7 @@ class EpochTrainer:
         
         self.ep = 0
 
-    def train(self, num_epochs, num_episodes_per_epoch, num_explorations = 1,
-              store_training_data = False):
+    def train(self, num_epochs, num_episodes_per_epoch, num_explorations = 1):
         
         total_episodes = num_epochs * num_episodes_per_epoch * num_explorations
 

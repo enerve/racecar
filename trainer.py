@@ -18,8 +18,11 @@ class Trainer:
         self.car = car
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
+
+        util.pre_driver_alg = self.driver.prefix()
+        self.logger.debug("Driver: %s", util.pre_driver_alg)
     
-    def train(self, num_episodes, pref='', save_to_file=True):
+    def train(self, num_episodes, pref=''):
             
         # track counts of last juncture reached
         smooth = num_episodes // 100
@@ -36,7 +39,7 @@ class Trainer:
         self.stat_m = []#[] for _ in range(driver.num_junctures + 1)]
         self.stat_e_1000 = []
             
-        self.logger.debug("Starting")
+        self.logger.debug("Starting for %d episodes", num_episodes)
         start_time = time.clock()
         
         best_R = -10000
@@ -46,7 +49,8 @@ class Trainer:
         
         num_restarts = 0
         for ep in range(num_episodes):
-            total_R, environment = self.driver.run_episode(self.track, self.car)
+            total_R, environment, ep_steps = self.driver.run_episode(
+                self.track, self.car)
     
             count_m[ep % smooth] = Eye[environment.curr_juncture]
             
@@ -102,10 +106,9 @@ class Trainer:
                 
             len_bp_split = (num_episodes // 100)
             recent_total_R += (total_R - recent_total_R) * 10 / len_bp_split
-            if ep > 0 and ep % len_bp_split == len_bp_split - 1:
-                bestpath_R, bestpath_env = self.driver.run_episode(self.track, 
-                                                                   self.car, 
-                                                                   run_best=True)
+            if (ep + 1) % len_bp_split == 0:
+                bestpath_R, bestpath_env, _ = self.driver.run_best_episode(
+                    self.track, self.car)
                 self.stat_bestpath_times.append(bestpath_env.total_time_taken() 
                                            if bestpath_env.has_reached_finish() 
                                            else 500)
@@ -114,9 +117,11 @@ class Trainer:
                 self.stat_recent_total_R.append(recent_total_R)
                 self.stat_bestpath_juncture.append(bestpath_env.curr_juncture)
                 
+                self.logger.debug("Ep %d - with R=%d T=%d", ep, bestpath_R,
+                                  self.stat_bestpath_times[-1])
     
-            if util.checkpoint_reached(ep, 1000):
-                self.logger.debug("Ep %d ", ep)
+#             if util.checkpoint_reached(ep, 1000):
+#                 self.logger.debug("Ep %d ", ep)
                 
             #if util.checkpoint_reached(ep, num_episodes // 2):
             #    self.driver.restart_exploration()
@@ -124,16 +129,19 @@ class Trainer:
     
         self.logger.debug("Completed training in %d seconds", time.clock() - start_time)
     
-        if save_to_file:
-            # save learned values to file
-            self.driver.save_model(pref=pref)
-            
-            # save stats to file
-            self.save_stats(pref=pref)        
-    
         return (self.stat_bestpath_times, self.stat_e_bp,
                 self.stat_bestpath_R, self.stat_bestpath_juncture)
     
+    def load_from_file(self, subdir):
+        self.driver.load_model(subdir)
+        #self.load_stats(subdir)
+
+    def save_to_file(self, pref=''):
+        # save learned values to file
+        self.driver.save_model(pref=pref)
+        
+        # save stats to file
+        self.save_stats(pref=pref)        
     
     def save_stats(self, pref=None):
         self.driver.save_stats(pref=pref)
@@ -171,7 +179,7 @@ class Trainer:
         C = util.load("statsC", subdir, pref)
         self.stat_e_1000 = C
     
-    def report_stats(self, pref=None):
+    def report_stats(self, pref=""):
         self.driver.report_stats(pref=pref)
         
 #         util.plot([[x for x in self.stat_bestpath_times],
@@ -189,21 +197,21 @@ class Trainer:
 #         labels = ["ms %d" % i for i in range(len(S_m))]
 #         util.plot(S_m, self.stat_e_1000, labels, "Max juncture reached", pref="ms")
     
-    def play_best(self, should_play_movie=True, pref=""):
-        #logger.debug("Playing best path")
-        environment = self.best_environment()
-        environment.report_history()
-        environment.play_movie(show=should_play_movie, pref="bestmovie_%s" % pref)
-        return environment
-    
-    def show_best(self, show=True, pref=""):
-        #logger.debug("Playing best path")
-        environment = self.best_environment()
-        environment.report_history()
-        environment.show_path(show=show, pref="bestpath_%s" % pref)
-        return environment
-    
-    def best_environment(self):
-        total_R, environment = self.driver.run_episode(self.track, self.car, 
-                                                       run_best=True)
-        return environment
+#     def play_best(self, should_play_movie=True, pref=""):
+#         #logger.debug("Playing best path")
+#         environment = self.best_environment()
+#         environment.report_history()
+#         environment.play_movie(show=should_play_movie, pref="bestmovie_%s" % pref)
+#         return environment
+#     
+#     def show_best(self, show=True, pref=""):
+#         #logger.debug("Playing best path")
+#         environment = self.best_environment()
+#         environment.report_history()
+#         environment.show_path(show=show, pref="bestpath_%s" % pref)
+#         return environment
+#     
+#     def best_environment(self):
+#         total_R, environment = self.driver.run_episode(self.track, self.car, 
+#                                                        run_best=True)
+#         return environment

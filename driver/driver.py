@@ -17,13 +17,8 @@ class Driver(object):
     '''
 
     def __init__(self,
+                 config,
                  fa,
-                 num_junctures,
-                 num_lanes,
-                 num_speeds,
-                 num_directions,
-                 num_steer_positions,
-                 num_accel_positions,
                  mimic_fa):
         '''
         Constructor
@@ -35,23 +30,23 @@ class Driver(object):
         
         self.fa = fa
 
-        self.num_junctures = num_junctures
-        self.num_lanes = num_lanes
-        self.num_speeds = num_speeds
-        self.num_directions = num_directions
-        self.num_steer_positions = num_steer_positions
-        self.num_accel_positions = num_accel_positions
+        self.num_junctures = config.NUM_JUNCTURES
+        self.num_lanes = config.NUM_LANES
+        self.num_directions = config.NUM_DIRECTIONS 
+        self.num_speeds = config.NUM_SPEEDS
+        self.num_steer_positions = config.NUM_STEER_POSITIONS
+        self.num_accel_positions = config.NUM_ACCEL_POSITIONS
         self.mimic_fa = mimic_fa
 
         # C is the count of visits to state/action
-        self.C = np.zeros((num_junctures,
-                           num_lanes,
-                           num_speeds,
-                           num_directions,
-                           num_steer_positions,
-                           num_accel_positions), dtype=np.int32)
+        self.C = np.zeros((self.num_junctures,
+                           self.num_lanes,
+                           self.num_speeds,
+                           self.num_directions,
+                           self.num_steer_positions,
+                           self.num_accel_positions), dtype=np.int32)
         # Rs is the average reward at juncture (for statistics)
-        self.Rs = np.zeros((num_junctures), dtype=np.float)
+        self.Rs = np.zeros((self.num_junctures), dtype=np.float)
 
 
     def restart_exploration(self):

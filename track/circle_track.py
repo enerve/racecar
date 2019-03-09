@@ -13,8 +13,7 @@ from track import Track
 class CircleTrack(Track):
     
     
-    def __init__(self, center, radius, width, num_junctures, num_milestones,
-                 num_lanes):
+    def __init__(self, center, radius, width, config):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
 
@@ -22,9 +21,9 @@ class CircleTrack(Track):
         self.center = center
         self.radius = radius
         self.width = width
-        self.num_junctures = num_junctures
-        self.num_milestones = num_milestones
-        self.num_lanes = num_lanes
+        self.num_junctures = config.NUM_JUNCTURES
+        self.num_milestones = config.NUM_MILESTONES
+        self.num_lanes = config.NUM_LANES
         
     def get_starting_position(self):
         start_loc = (0, -self.radius)

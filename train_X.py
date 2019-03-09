@@ -8,23 +8,26 @@ import logging
 
 from car import Car
 from driver import *
+from function import *
 from track import LineTrack
 from trainer import Trainer
 import cmd_line
 import log
+import trainer_helper as th
+import util
+
 import numpy as np
 import random
-import util
 import matplotlib.pyplot as plt
 
 def main():
     args = cmd_line.parse_args()
 
-    util.prefix_init(args)
+    util.init(args)
     util.pre_problem = 'RC X'
 
     logger = logging.getLogger()
-    log.configure_logger(logger, "RaceCar FS X")
+    log.configure_logger(logger, "RaceCar X")
     logger.setLevel(logging.DEBUG)
 
     # --------------
@@ -44,68 +47,66 @@ def main():
             (45, 110),
             (10, 10)
         ]
-    NUM_JUNCTURES = 200
-    NUM_MILESTONES = 200
-    NUM_LANES = 5
-    MAX_SPEED = NUM_SPEEDS = 3
-    NUM_DIRECTIONS = 20
-    
-    NUM_STEER_POSITIONS = 3
-    NUM_ACCEL_POSITIONS = 3
+
+    config = th.CONFIG(
+        NUM_JUNCTURES = 200,
+        NUM_MILESTONES = 200,
+        NUM_LANES = 5,
+        NUM_SPEEDS = 3,
+        NUM_DIRECTIONS = 20,
+        NUM_STEER_POSITIONS = 3,
+        NUM_ACCEL_POSITIONS = 3
+    )
 
     WIDTH = 20
-    track = LineTrack(points, WIDTH, NUM_JUNCTURES, NUM_MILESTONES,
-                      NUM_LANES)
-    
-#     plt.imshow(track.draw(), aspect='equal')
-#     plt.show()
-#     return
-    
-    NUM_SPEEDS = 3
-    car = Car(NUM_DIRECTIONS, NUM_SPEEDS)
+    track = LineTrack(points, WIDTH, config)
+    car = Car(config)
     
     logger.debug("*Problem:\t%s", util.pre_problem)
-    logger.debug("   NUM_JUNCTURES:\t%s", NUM_JUNCTURES)
-    logger.debug("   NUM_MILESTONES:\t%s", NUM_MILESTONES)
-    logger.debug("   NUM_LANES:\t%s", NUM_LANES)
-    logger.debug("   MAX_SPEED:\t%s", MAX_SPEED)
-    logger.debug("   NUM_DIRECTIONS:\t%s", NUM_DIRECTIONS)
-    logger.debug("   NUM_STEER_POSITIONS:\t%s", NUM_STEER_POSITIONS)
-    logger.debug("   NUM_ACCEL_POSITIONS:\t%s", NUM_ACCEL_POSITIONS)
+    logger.debug("   %s", config)
     
     seed = 123
     random.seed(seed)
     np.random.seed(seed)
 
-#     driver = QDriver(1, # alpha
-#                     1, # gamma
-#                     10, # explorate
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-    driver = SarsaLambdaDriver(0.9, # lambda
-                    0.2, # alpha
-                    1, # gamma
-                    400, # explorate
-                    NUM_JUNCTURES,
-                    NUM_LANES,
-                    NUM_SPEEDS,
-                    NUM_DIRECTIONS,
-                    NUM_STEER_POSITIONS,
-                    NUM_ACCEL_POSITIONS)
+    # ------------------ Guide driver FA -----------------
+
+    driver_fa = QLookup(config,
+                        alpha=0.4)
+
+    # ------------------ Mimic FA -----------------
+    mimic_fa = None
+
+    # ------------------ Guide driver RL algorithm ---------------
+
+    driver = th.create_driver(config, 
+                    alg = 'sarsalambda', 
+                    expl = 19,
+                    lam = 0.9,
+                    fa=driver_fa,
+                    mimic_fa=mimic_fa)
+
+    # ------------------ Student driver FA -----------------
+
+    # ------------------ Student driver RL algorithm -------------
+    student = None
+
+    # ------------------ Training -------------------
+
     trainer = Trainer(driver, track, car)
     
-    subdir = "212870_RC X_sarsa_lambda_400_0.2_1.0_0.9_"
-    driver.load_model(subdir)
-    trainer.load_stats(subdir)
+#     subdir = "212870_RC X_sarsa_lambda_400_0.2_1.0_0.9_"
+#     driver.load_model(subdir)
+#     trainer.load_stats(subdir)
     trainer.train(100*1000)
 
     trainer.report_stats()
-    trainer.play_best()
              
+
+    t_R, b_E, _ = driver.run_best_episode(track, car, False)
+    logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
+                 b_E.total_time_taken())
+    b_E.play_movie(pref="bestmovie")
 
     # --------- CV ---------
 #     explorates = [10, 100, 1000, 10000]

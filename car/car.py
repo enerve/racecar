@@ -10,13 +10,13 @@ import numpy as np
 
 class Car():
     
-    def __init__(self, num_directions, num_speeds):
+    def __init__(self, config):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         
         # TODO :these should both be avoided (i.e. dir/speed may be real)
-        self.num_directions = num_directions
-        self.num_speeds = num_speeds
+        self.num_directions = config.NUM_DIRECTIONS 
+        self.num_speeds = config.NUM_SPEEDS
         
     def restart(self, track, should_record):
         self.location, self.direction = track.get_starting_position()

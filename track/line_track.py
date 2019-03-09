@@ -16,8 +16,7 @@ class LineTrack(Track):
     A track defined by a loop of connected lines.
     '''
 
-    def __init__(self, points, track_width, num_junctures, num_milestones,
-                 num_lanes):
+    def __init__(self, points, track_width, config):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
 
@@ -27,9 +26,9 @@ class LineTrack(Track):
         
         self.W, self.H = 240, 220
         self.track_width = track_width
-        self.num_junctures = num_junctures
-        self.num_milestones = num_milestones
-        self.num_lanes = num_lanes
+        self.num_junctures = config.NUM_JUNCTURES
+        self.num_milestones = config.NUM_MILESTONES
+        self.num_lanes = config.NUM_LANES
 
         self.lines = []
         self.lengths = []

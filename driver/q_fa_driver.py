@@ -17,27 +17,19 @@ class QFADriver(Driver):
     An agent that learns to drive a car along a track, optimizing using Q alg
     '''
     
-    def __init__(self, gamma, explorate,
+    def __init__(self,
+                 config,
+                 gamma,
+                 explorate,
                  fa,
-                 num_junctures,
-                 num_lanes,
-                 num_speeds,
-                 num_directions,
-                 num_steer_positions,
-                 num_accel_positions,
                  mimic_fa):
         '''
         Constructor
         fa is the value function approximator that guides the episodes and
             learns on the job, using the Q algorithm
         '''
-        super().__init__(fa,
-                         num_junctures,
-                         num_lanes,
-                         num_speeds,
-                         num_directions,
-                         num_steer_positions,
-                         num_accel_positions,
+        super().__init__(config,
+                         fa,
                          mimic_fa)
         
         self.logger = logging.getLogger(__name__)
@@ -58,14 +50,14 @@ class QFADriver(Driver):
                            self.num_directions), dtype=np.int32)
                            
         # C is the count of visits to state/action
-        self.C = np.zeros((num_junctures,
-                           num_lanes,
-                           num_speeds,
-                           num_directions,
-                           num_steer_positions,
-                           num_accel_positions), dtype=np.int32)
+        self.C = np.zeros((self.num_junctures,
+                           self.num_lanes,
+                           self.num_speeds,
+                           self.num_directions,
+                           self.num_steer_positions,
+                           self.num_accel_positions), dtype=np.int32)
         # Rs is the average reward at juncture (for statistics)
-        self.Rs = np.zeros((num_junctures), dtype=np.float)
+        self.Rs = np.zeros((self.num_junctures), dtype=np.float)
         self.avg_delta = 0
         self.restarted = False
 
@@ -207,8 +199,6 @@ class QFADriver(Driver):
         if util.checkpoint_reached(ep, num_episodes // 100):
             self.stat_e_100.append(ep)
 
-            self.stat_qm.append(self.Q.sum(axis=(1,2,3,4,5)))
-
             self.stat_dlm.append(self.avg_delta)
             if self.mimic_fa:
                 self.stat_dlm2.append(self.avg_delta2)
@@ -229,8 +219,8 @@ class QFADriver(Driver):
                   ["Avg ΔQ table"], pref=pref+"delta",
                   ylim=None)#(-100, 1000))
 
-        self.q_plotter.play_animation(save=True, pref="QLanes")
-        self.qx_plotter.play_animation(show=True, save=True, pref="QMaxLanes_%s" % pref)
+#         self.q_plotter.play_animation(save=True, pref="QLanes")
+#         self.qx_plotter.play_animation(show=True, save=True, pref="QMaxLanes_%s" % pref)
 
         if self.mimic_fa:
             self.mimic_fa.report_stats(pref)
