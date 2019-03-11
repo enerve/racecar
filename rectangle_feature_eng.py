@@ -16,12 +16,8 @@ class RectangleFeatureEng(FeatureEng):
     Feature engineering for polynomial regression of rectangular track
     '''
 
-    def __init__(self, num_junctures,
-                 num_lanes,
-                 num_speeds,
-                 num_directions,
-                 num_steer_positions,
-                 num_accel_positions,
+    def __init__(self, 
+                 config,
                  include_basis = False,
                  include_sin_cosine = False,
                  include_splines = False,
@@ -35,13 +31,14 @@ class RectangleFeatureEng(FeatureEng):
         '''
         
         # states
-        self.num_junctures = num_junctures
-        self.num_lanes = num_lanes
-        self.num_speeds = num_speeds
-        self.num_directions = num_directions
+        self.num_junctures = config.NUM_JUNCTURES
+        self.num_lanes = config.NUM_LANES
+        self.num_directions = config.NUM_DIRECTIONS 
+        self.num_speeds = config.NUM_SPEEDS
         # actions
-        self.num_steer_positions = num_steer_positions
-        self.num_accel_positions = num_accel_positions
+        self.num_steer_positions = config.NUM_STEER_POSITIONS
+        self.num_accel_positions = config.NUM_ACCEL_POSITIONS
+
         # feature engineering options
         self.include_basis = include_basis
         self.include_sin_cosine = include_sin_cosine
@@ -63,22 +60,22 @@ class RectangleFeatureEng(FeatureEng):
             scale_list.append(1)
         
         shift_list.extend([
-                     num_lanes / 2.,
-                     num_speeds / 2.,
-                     num_directions / 2.])
+                    self.num_lanes / 2.,
+                    self.num_speeds / 2.,
+                    self.num_directions / 2.])
         scale_list.extend([
-                     num_lanes,
-                     num_speeds,
-                     num_directions])
+                    self.num_lanes,
+                    self.num_speeds,
+                    self.num_directions])
 
         if include_splines:
-            for knot in range(spline_length, num_junctures,
+            for knot in range(spline_length, self.num_junctures,
                               spline_length):
                 shift_list.append(knot / 2)
                 scale_list.append(knot)
         else:
-            shift_list.append(num_junctures / 2.)
-            scale_list.append(num_junctures)           
+            shift_list.append(self.num_junctures / 2.)
+            scale_list.append(self.num_junctures)           
 
         if include_corner_splines:
             for ka, kb in zip(corners, corners[1:]):
@@ -162,19 +159,20 @@ class RectangleFeatureEng(FeatureEng):
             x_list.append(max(0, lane - 1))
             x_list.append(max(0, 3 - lane))
 
-        x1 = torch.Tensor(x_list).to(self.device)
-        x1 -= self.shift
-        x1 /= self.scale
-
-        x = x1
-        if self.poly_degree >= 2:
-            x = torch.ger(x, x1).flatten()
-            if self.poly_degree == 3:
+        with torch.no_grad():
+            x1 = torch.Tensor(x_list).to(self.device)
+            x1 -= self.shift
+            x1 /= self.scale
+    
+            x = x1
+            if self.poly_degree >= 2:
                 x = torch.ger(x, x1).flatten()
-            elif self.poly_degree == 4:
-                x = torch.ger(x, x).flatten()
-
-        return x
+                if self.poly_degree == 3:
+                    x = torch.ger(x, x1).flatten()
+                elif self.poly_degree == 4:
+                    x = torch.ger(x, x).flatten()
+    
+            return x
     
     def a_index(self, a_tuple):
         steer, accel = a_tuple

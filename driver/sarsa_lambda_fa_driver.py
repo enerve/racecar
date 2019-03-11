@@ -239,8 +239,8 @@ class SarsaLambdaFADriver(Driver):
         if util.checkpoint_reached(ep, num_episodes // 200):
             self.stat_e_200.append(ep)
     
-            self.q_plotter.add_image(self.fa.plottable((2, 3, 4, 5)))
-            self.qx_plotter.add_image(self.fa.plottable((2, 3, 4, 5), pick_max=True))
+#             self.q_plotter.add_image(self.fa.plottable((2, 3, 4, 5)))
+#             self.qx_plotter.add_image(self.fa.plottable((2, 3, 4, 5), pick_max=True))
 
     def report_stats(self, pref):
         super().report_stats(pref)

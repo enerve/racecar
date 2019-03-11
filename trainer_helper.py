@@ -61,3 +61,31 @@ def create_driver_i(config, i_alg, expl, lam, fa, mimic_fa):
                         fa,
                         mimic_fa)
     return driver
+
+def create_student(config, alg, lam, fa):
+    return create_student_i(config, ALG[alg], lam, fa)
+
+def create_student_i(config, i_alg, lam, fa):
+    if i_alg == 0:
+        driver = QFAStudent(config,
+                        1, # gamma
+                        fa,
+                        None)
+    elif i_alg == 1:    
+        driver = SarsaFAStudent(config,
+                        1, # gamma
+                        fa,
+                        None)
+    elif i_alg == 2:
+        driver = QLambdaFAStudent(config,
+                        lam, #lambda
+                        1, # gamma
+                        fa,
+                        None)
+    elif i_alg == 3:
+        driver = SarsaLambdaFAStudent(config,
+                        lam, #lambda
+                        1, # gamma
+                        fa,
+                        None)
+    return driver

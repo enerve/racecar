@@ -72,34 +72,23 @@ def main():
     # ------------------ Guide driver FA -----------------
 
     driver_fa = QLookup(config,
-                        alpha=0.2)
+                        alpha=0.5)
 
-#     driver_fe = RectangleFeatureEng(
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-# 
+#     driver_fe = RectangleFeatureEng(config)
+#  
 #     driver_fa = MultiPolynomialRegression(
 #                     0.002, # alpha ... #4e-5 old alpha without batching
 #                     0.005, # regularization constant
 #                     256, # batch_size
 #                     1000, # max_iterations
 #                     0.000, # dampen_by
-#                     driver_)
+#                     driver_fe)
 
     # ------------------ Mimic FA -----------------
     mimic_fa = None
  
 #     mimic_fe = RectangleFeatureEng(
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS,
+#                     config,
 #                     include_basis = True,
 #                     include_sin_cosine = True,
 #                     include_splines = True,
@@ -108,7 +97,6 @@ def main():
 #                     corners = [0, 4, 15, 33, 44, 49],
 #                     include_bounded_features = True,
 #                     poly_degree = 2)
-#   
 #     mimic_fa = MultiPolynomialRegression(
 #                     10.0, # alpha ... #4e-5 old alpha without batching
 #                     0.0001, # regularization constant
@@ -117,41 +105,29 @@ def main():
 #                     0.001, # dampen_by
 #                     mimic_fe)
     
-#     mimic_fe2 = RectangleFeatureEng(
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#  
+#     mimic_fe2 = RectangleFeatureEng(config)
 #     mimic_fa = NN_FA(
 #                     0.000001, # alpha ... #4e-5 old alpha without batching
 #                     1, # regularization constant
 #                     512, # batch_size
-#                     200, # max_iterations
+#                     2000, # max_iterations
 #                     mimic_fe2)
      
     # ------------------ Guide driver RL algorithm ---------------
 
     driver = th.create_driver(config, 
                     alg = 'sarsalambda',
-                    expl = 50,
-                    lam = 0.5,
+                    expl = 30, #200
+                    lam = 0.5, #0.8
                     fa=driver_fa,
                     mimic_fa=mimic_fa)
 
 
     # ------------------ Student driver FA -----------------
 
-#     student_fe = RectangleFeatureEng(
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-# 
+    student_fa = None
+
+#     student_fe = RectangleFeatureEng(config) 
 #     student_fa = MultiPolynomialRegression(
 #                     0.00001, # alpha ... #4e-5 old alpha without batching
 #                     0.005, # regularization constant
@@ -160,47 +136,31 @@ def main():
 #                     0.000, # dampen_by
 #                     student_fe)
 
-#     student_fe2 = RectangleFeatureEng(
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#  
-#     student_fa = NN_FA(
-#                     0.000001, # alpha ... #4e-5 old alpha without batching
-#                     1, # regularization constant
-#                     512, # batch_size
-#                     2000, # max_iterations
-#                     student_fe2)
+    student_fe2 = RectangleFeatureEng(config)
+    student_fa = NN_FA(
+                    0.000001, # alpha ... #4e-5 old alpha without batching
+                    1, # regularization constant
+                    512, # batch_size
+                    2000, # max_iterations
+                    student_fe2)
     
     # ------------------ Student driver RL algorithm -------------
     student = None
-# 
-#     student = QLambdaFAStudent(
-#                     0.8, #lambda
-#                     1, # gamma
-#                     student_fa,
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS,
-#                     None)
-    
-    
+ 
+    student = th.create_student(config, 
+                    alg = 'sarsalambda',
+                    lam = 0.8,
+                    fa=student_fa)
     
     # ------------------ Training -------------------
     
-    util.start_interactive()
+#     util.start_interactive()
 
     #subdir = "97640_RC rect_DR_sarsa_lambda_e50_l0.50_Qtable_a0.4___" # good path
     #driver.load_model(subdir)
-    trainer = Trainer(driver, track, car)
-    #trainer = EpochTrainer(driver, track, car, student)
-    trainer.train(1000)
+    #trainer = Trainer(driver, track, car)
+    trainer = EpochTrainer(driver, track, car, student)
+    #trainer.train(1000)
     
     #subdir = "215973_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2_M_multipoly_a0.002_r0.005_b256_i200_d0.0000_F3tftt__"
     # 100 x 500 x 10 trained on top of above
@@ -208,15 +168,14 @@ def main():
     # 
     #trainer.load_stats(subdir)
     
-    #trainer.train(100, 500, 1)
+    trainer.train(1, 1000, 1)
 #     trainer.train(10, 2000, 2)
     #trainer.save_to_file()
 #     #mimic_fa.store_training_data("mimic")
-    util.stop_interactive()
+#     util.stop_interactive()
 
-#     trainer.report_stats()
+    trainer.report_stats()
     
-#     # Load poly training data and train
 #     # 20000 episodes worth of training data, built upon 100 x 500 x 10 pretrain
 #     subdir = "311066_RC rect_DR_q_lambda_200_0.80_Qtable_a0.2_M_multipoly_a0.0002_r0.005_b256_i100_d0.0000_F3tftt__"
 #     mimic_fa.load_training_data("mimic", subdir)
@@ -226,23 +185,24 @@ def main():
 #     mimic_fa.report_stats("mimic")
 
 
-    t_R, b_E, _ = driver.run_best_episode(track, car, False)
-    logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
-                 b_E.total_time_taken())
-#     b_E.play_movie(pref="bestmovie")
-
-    if driver.mimic_fa:
-        t_R, b_E, _ = driver.run_best_episode(track, car, True)
-        logger.debug("Mimic best episode total R = %0.2f time=%d", t_R,
+    if driver:
+        t_R, b_E, _ = driver.run_best_episode(track, car, False)
+        logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
                      b_E.total_time_taken())
-        b_E.play_movie(pref="bestmovie_mimic")
-
-    if student:
-        t_R, b_E, _ = student.run_best_episode(track, car)
-        student_fa.report_stats("student")
-        logger.debug("Student best episode total R = %0.2f time=%d", t_R,
-                 b_E.total_time_taken())
-        b_E.play_movie(pref="bestmovie_student")
+    #     b_E.play_movie(pref="bestmovie")
+    
+        if driver.mimic_fa:
+            t_R, b_E, _ = driver.run_best_episode(track, car, True)
+            logger.debug("Mimic best episode total R = %0.2f time=%d", t_R,
+                         b_E.total_time_taken())
+            b_E.play_movie(pref="bestmovie_mimic")
+    
+        if student:
+            t_R, b_E, _ = student.run_best_episode(track, car)
+            student_fa.report_stats("student")
+            logger.debug("Student best episode total R = %0.2f time=%d", t_R,
+                     b_E.total_time_taken())
+            b_E.play_movie(pref="bestmovie_student")
 
 if __name__ == '__main__':
     main()

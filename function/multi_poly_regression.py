@@ -85,7 +85,9 @@ class MultiPolynomialRegression(ValueFunction):
 
     def _value(self, X):
         # Calculate polynomial value X * W
-        return X.matmul(self.W)
+        with torch.no_grad():
+            V = X.matmul(self.W)
+        return V
     
     def value(self, state, action):
         X = self.feature_eng.x_adjust(*state)

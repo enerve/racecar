@@ -97,6 +97,9 @@ class Driver(object):
 
     def report_stats(self, pref):
         pass
+    
+    def live_stats(self):
+        pass
 
     def save_model(self, pref=""):
         self.fa.save_model(pref)

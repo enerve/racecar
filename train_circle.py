@@ -61,7 +61,7 @@ def main():
 
     # ------------------ Guide driver FA -----------------
     driver_fa = QLookup(config,
-                        alpha=0.8)
+                        alpha=0.5)
     
 #     driver_fa =  PolynomialRegression(
 #                     0.002, # alpha ... #4e-5 old alpha without batching
@@ -74,13 +74,7 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-#     fe = CircleFeatureEng(
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
+#     fe = CircleFeatureEng(config)
 #     driver_fa = MultiPolynomialRegression(
 #                     0.0001, # alpha ... #4e-5 old alpha without batching
 #                     0.5, # regularization constant
@@ -104,13 +98,7 @@ def main():
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)        
 
-#     fe = CircleFeatureEng(
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
+#     fe = CircleFeatureEng(config)
 #     mimic_fa = MultiPolynomialRegression(
 #                     0.0002, # alpha ... #4e-5 old alpha without batching
 #                     0.002, # regularization constant
@@ -122,21 +110,16 @@ def main():
     # ------------------ Guide driver RL algorithm ---------------
 
     driver = th.create_driver(config, 
-                    alg = 'qlambda', 
-                    expl = 110,
-                    lam = 0.25,
+                    alg = 'sarsalambda', 
+                    expl = 50,
+                    lam = 0.5,
                     fa=driver_fa,
                     mimic_fa=mimic_fa)
 
 
     # ------------------ Student driver FA -----------------
 #     student_fa = QLookup(0.7,  # alpha
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
+#                     config)
 #     student_fa =  PolynomialRegression(
 #                     0.05, # alpha ... #4e-5 old alpha without batching
 #                     0, # regularization constant
@@ -148,64 +131,36 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-#     student_fa = MultiPolynomialRegression(
-#                     0.0002, # alpha ... #4e-5 old alpha without batching
-#                     0.002, # regularization constant
-#                     0, # batch_size
-#                     200, # max_iterations
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
+    student_fe = CircleFeatureEng(config) 
+    student_fa = MultiPolynomialRegression(
+                    0.002, # alpha ... #4e-5 old alpha without batching
+                    0.002, # regularization constant
+                    0, # batch_size
+                    2000, # max_iterations
+                    0.000, # dampen_by
+                    student_fe)
 
     # ------------------ Student driver RL algorithm -------------
     student = None
 
-#     student = QFAStudent(
-#                     1, # gamma
-#                     student_fa,
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#     student = SarsaLambdaFAStudent(
-#                     1, #lambda
-#                     1, # gamma
-#                     student_fa,
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#     student = QLambdaFAStudent(
-#                     0.35, #lambda
-#                     1, # gamma
-#                     student_fa,
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
+    student = th.create_student(config, 
+                    alg = 'sarsalambda',
+                    lam = 0.8,
+                    fa=student_fa)
     
     # ------------------ Training -------------------
 
     trainer = Trainer(driver, track, car)
-    trainer.train(20000)
+#     trainer.train(20000)
     
-    #trainer = EpochTrainer(driver, track, car, student)
+    trainer = EpochTrainer(driver, track, car, student)
     
     #trainer.load_from_file("")
 
     # QLookup 4-explored 8000 episode QLambda-updated Qlookup 
     #trainer.load_from_file("439945_RC circle_DR_q_lambda_76_0.35_Qtable_a0.7_T_poly_a0.01_r0.002_b256_i50000_3ttt__")
 
-    #trainer.train(5, 500, 1)
+    trainer.train(1, 7000, 1)
 
 #     driver.mimic_fa = False
 #     trainer.train(1, 8000, 3)

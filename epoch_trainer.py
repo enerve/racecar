@@ -142,11 +142,13 @@ class EpochTrainer:
                 self.driver.update_fa()
                 
                 if self.student:
+                    self.logger.debug("Student observing...")
                     # Train the student driver with the history of episodes
                     for ep_steps in history:
                         self.student.observe_episode(ep_steps)
                         self.student.collect_stats(ep_s, total_episodes)
                         ep_s += 1
+                    self.logger.debug("Student updating...")
                     self.student.update_fa()
                     self.student.live_stats()
             

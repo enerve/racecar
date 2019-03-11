@@ -16,25 +16,19 @@ class SarsaLambdaFAStudent(Driver):
     and optimizing using Sarsa(λ)
     '''
 
-    def __init__(self, lam, gamma,
+    def __init__(self,
+                 config,
+                 lam,
+                 gamma,
                  fa,
-                 num_junctures,
-                 num_lanes,
-                 num_speeds,
-                 num_directions,
-                 num_steer_positions,
-                 num_accel_positions):
+                 mimic_fa):
         '''
         Constructor
         fa is the value function approximator that learns from the episodes
         '''
-        super().__init__(fa,
-                         num_junctures,
-                         num_lanes,
-                         num_speeds,
-                         num_directions,
-                         num_steer_positions,
-                         num_accel_positions)
+        super().__init__(config,
+                         fa,
+                         mimic_fa)
         
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -44,9 +38,9 @@ class SarsaLambdaFAStudent(Driver):
 
         self.fa = fa
         
-        self.eligible_mult = [(lam * gamma) ** i for i in range(num_junctures)]
-        self.eligible_states = [None for i in range(num_junctures)]
-        self.eligible_state_target = [0 for i in range(num_junctures)]
+        self.eligible_mult = [(lam * gamma) ** i for i in range(self.num_junctures)]
+        self.eligible_states = [None for i in range(self.num_junctures)]
+        self.eligible_state_target = [0 for i in range(self.num_junctures)]
         
         # TODO: move N to FA?
         # N is the count of visits to state
@@ -56,14 +50,14 @@ class SarsaLambdaFAStudent(Driver):
                            self.num_directions), dtype=np.int32)
                            
         # C is the count of visits to state/action
-        self.C = np.zeros((num_junctures,
-                           num_lanes,
-                           num_speeds,
-                           num_directions,
-                           num_steer_positions,
-                           num_accel_positions), dtype=np.int32)
+        self.C = np.zeros((self.num_junctures,
+                           self.num_lanes,
+                           self.num_speeds,
+                           self.num_directions,
+                           self.num_steer_positions,
+                           self.num_accel_positions), dtype=np.int32)
         # Rs is the average reward at juncture (for statistics)
-        self.Rs = np.zeros((num_junctures), dtype=np.float)
+        self.Rs = np.zeros((self.num_junctures), dtype=np.float)
         self.avg_delta = 0
 
         # Stats

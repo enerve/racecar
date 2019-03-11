@@ -22,46 +22,42 @@ class CircleFeatureEng(FeatureEng):
     BOUNDED_FEATURES = True
     POLY_DEGREE = 3
 
-    def __init__(self, num_junctures,
-                 num_lanes,
-                 num_speeds,
-                 num_directions,
-                 num_steer_positions,
-                 num_accel_positions):
+    def __init__(self,
+                 config):
         '''
         Constructor
         '''
         
         # states
-        self.num_junctures = num_junctures
-        self.num_lanes = num_lanes
-        self.num_speeds = num_speeds
-        self.num_directions = num_directions
+        self.num_junctures = config.NUM_JUNCTURES
+        self.num_lanes = config.NUM_LANES
+        self.num_directions = config.NUM_DIRECTIONS 
+        self.num_speeds = config.NUM_SPEEDS
         # actions
-        self.num_steer_positions = num_steer_positions
-        self.num_accel_positions = num_accel_positions
+        self.num_steer_positions = config.NUM_STEER_POSITIONS
+        self.num_accel_positions = config.NUM_ACCEL_POSITIONS
         
         self.device = torch.device('cuda' if util.use_gpu else 'cpu')
 
         # Hard-coded normalization params for the RaceCar state parameters
         
         shift_list = [0,
-                     num_lanes / 2.,
-                     num_speeds / 2.,
-                     num_directions / 2.]
+                    self.num_lanes / 2.,
+                    self.num_speeds / 2.,
+                    self.num_directions / 2.]
         scale_list = [1,
-                     num_lanes,
-                     num_speeds,
-                     num_directions]
+                    self.num_lanes,
+                    self.num_speeds,
+                    self.num_directions]
 
         if self.SPLINE:
-            for knot in range(self.SPLINE_LENGTH, num_junctures,
+            for knot in range(self.SPLINE_LENGTH, self.num_junctures,
                               self.SPLINE_LENGTH):
                 shift_list.append(knot / 2)
                 scale_list.append(knot)
         else:
-            shift_list.append(num_junctures / 2.)
-            scale_list.append(num_junctures)           
+            shift_list.append(self.num_junctures / 2.)
+            scale_list.append(self.num_junctures)           
 
         if self.INCLUDE_SIN_COSINE:
             shift_list.extend([0,
@@ -120,17 +116,18 @@ class CircleFeatureEng(FeatureEng):
             x_list.append(max(0, lane - 1))
             x_list.append(max(0, 3 - lane))
 
-        x1 = torch.Tensor(x_list).to(self.device)
-        x1 -= self.shift
-        x1 /= self.scale
-
-        x = x1
-        if self.POLY_DEGREE >= 2:
-            x = torch.ger(x, x1).flatten()
-            if self.POLY_DEGREE == 3:
+        with torch.no_grad():
+            x1 = torch.Tensor(x_list).to(self.device)
+            x1 -= self.shift
+            x1 /= self.scale
+    
+            x = x1
+            if self.POLY_DEGREE >= 2:
                 x = torch.ger(x, x1).flatten()
-            elif self.POLY_DEGREE == 4:
-                x = torch.ger(x, x).flatten()
+                if self.POLY_DEGREE == 3:
+                    x = torch.ger(x, x1).flatten()
+                elif self.POLY_DEGREE == 4:
+                    x = torch.ger(x, x).flatten()
 
         return x
     
