@@ -1,5 +1,5 @@
 '''
-Created on 14 Feb 2019
+Created on 12 Mar 2019
 
 @author: enerve
 '''
@@ -11,9 +11,9 @@ import math
 import torch
 
 
-class CircleFeatureEng(FeatureEng):
+class CircleSAFeatureEng(FeatureEng):
     '''
-    Feature engineering for States of circular track
+    Feature engineering for States and Actions of circular track
     '''
 
     INCLUDE_SIN_COSINE = True
@@ -44,11 +44,15 @@ class CircleFeatureEng(FeatureEng):
         shift_list = [0,
                     self.num_lanes / 2.,
                     self.num_speeds / 2.,
-                    self.num_directions / 2.]
+                    self.num_directions / 2.,
+                    self.num_steer_positions / 2.,
+                    self.num_accel_positions / 2.]
         scale_list = [1,
                     self.num_lanes,
                     self.num_speeds,
-                    self.num_directions]
+                    self.num_directions,
+                    self.num_steer_positions,
+                    self.num_accel_positions]
 
         if self.SPLINE:
             for knot in range(self.SPLINE_LENGTH, self.num_junctures,
@@ -71,16 +75,19 @@ class CircleFeatureEng(FeatureEng):
                 
         if self.BOUNDED_FEATURES:
             shift_list.extend([1,
-                         1])
+                         1,
+                         0.5,
+                         0.5,
+                         0.5])
             scale_list.extend([2,
-                         2])
+                         2,
+                         1,
+                         1,
+                         1])
 
         self.shift = torch.Tensor(shift_list).to(self.device)
         self.scale = torch.Tensor(scale_list).to(self.device)
         self.num_inputs = len(shift_list)
-        
-    def num_actions(self):
-        return self.num_steer_positions * self.num_accel_positions
         
     def prefix(self):
         return '%d%s%s%s' % (self.POLY_DEGREE,
@@ -88,14 +95,16 @@ class CircleFeatureEng(FeatureEng):
                              't' if self.SPLINE else 'f',
                              't' if self.BOUNDED_FEATURES else 'f')
 
-    def initial_W(self):
-        return torch.randn(self.num_inputs ** self.POLY_DEGREE,
-                           self.num_actions()).to(self.device)
+    def num_actions(self):
+        return self.num_steer_positions * self.num_accel_positions
 
-    def x_adjust(self, juncture, lane, speed, direction):
+    def initial_W(self):
+        return torch.randn(self.num_inputs ** self.POLY_DEGREE).to(self.device)
+
+    def x_adjust(self, juncture, lane, speed, direction, steer, accel):
         ''' Takes the input params and converts it to an input feature array
         '''
-        x_list = [1, lane, speed, direction]
+        x_list = [1, lane, speed, direction, steer, accel]
 
         if self.SPLINE:
             for knot in range(self.SPLINE_LENGTH, self.num_junctures,
@@ -115,6 +124,9 @@ class CircleFeatureEng(FeatureEng):
         if self.BOUNDED_FEATURES:
             x_list.append(max(0, lane - 1))
             x_list.append(max(0, 3 - lane))
+            x_list.append(max(0, steer - 1))
+            x_list.append(max(0, 1 - steer))
+            x_list.append(max(0, accel - 1))
 
         with torch.no_grad():
             x1 = torch.Tensor(x_list).to(self.device)

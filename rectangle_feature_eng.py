@@ -13,7 +13,7 @@ from function import FeatureEng
 
 class RectangleFeatureEng(FeatureEng):
     '''
-    Feature engineering for polynomial regression of rectangular track
+    Feature engineering for States of rectangular track
     '''
 
     def __init__(self, 

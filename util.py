@@ -86,7 +86,8 @@ def stop_interactive():
     plt.ioff()
     plt.cla()
 
-def plot(lines, x, labels=None, title=None, pref=None, ylim=None, live=False):
+def plot(lines, x, labels=None, title=None, legend_title="", pref=None,
+         ylim=None, live=False):
     if live:
         plt.cla()
     for i in range(len(lines)):
@@ -96,7 +97,7 @@ def plot(lines, x, labels=None, title=None, pref=None, ylim=None, live=False):
         else:
             plt.plot(x, l)
     if labels:
-        plt.legend()
+        plt.legend(title=legend_title)
     if title:
         plt.title(title, loc='center')
     if ylim:

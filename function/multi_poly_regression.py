@@ -4,11 +4,11 @@ Created on Feb 9, 2019
 @author: enerve
 '''
 
-import logging
-import time
 import util
 
+import logging
 import numpy as np
+import time
 import torch
 
 from function.value_function import ValueFunction
@@ -173,6 +173,7 @@ class MultiPolynomialRegression(ValueFunction):
         epoch_shx = []
         epoch_sht = []
         before_unique = after_unique = 0
+        # TODO: Use autograd?
         for ai in range(self.num_actions):
             SHX = torch.stack(steps_history_x[ai]).to(self.device)
             SHT = torch.tensor(steps_history_t[ai]).to(self.device)
@@ -428,10 +429,12 @@ class MultiPolynomialRegression(ValueFunction):
     
     def report_stats(self, pref=""):
         self.logger.debug("Final W: %s", self.W)
+        labels = [self.feature_eng.a_tuple(x) for x in range(len(self.stat_error_cost))]
         util.plot(self.stat_error_cost,
                   range(len(self.stat_error_cost[0])),
-                  labels = range(len(self.stat_error_cost)),
+                  labels = labels,
                   title = "MultiPoly training cost",
+                  legend_title = "(steer, accel)",
                   pref=pref+"cost",
                   ylim=None)#(0, 50000))
         util.plot_all(self.stat_epoch_cost,

@@ -13,6 +13,7 @@ from trainer import Trainer
 from driver import *
 from function import *
 from circle_feature_eng import CircleFeatureEng
+from circle_sa_feature_eng import CircleSAFeatureEng
 import trainer_helper as th
 import cmd_line
 import log
@@ -61,7 +62,7 @@ def main():
 
     # ------------------ Guide driver FA -----------------
     driver_fa = QLookup(config,
-                        alpha=0.5)
+                        alpha=0.2)
     
 #     driver_fa =  PolynomialRegression(
 #                     0.002, # alpha ... #4e-5 old alpha without batching
@@ -86,33 +87,29 @@ def main():
     # ------------------ Mimic FA -----------------
     mimic_fa = None
 
+#     fe = CircleSAFeatureEng(config)
 #     mimic_fa = PolynomialRegression(
 #                     0.01, # alpha ... #4e-5 old alpha without batching
 #                     0.002, # regularization constant
 #                     256, # batch_size
-#                     50000, # max_iterations
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)        
+#                     100000, # max_iterations
+#                     fe)
 
-#     fe = CircleFeatureEng(config)
-#     mimic_fa = MultiPolynomialRegression(
-#                     0.0002, # alpha ... #4e-5 old alpha without batching
-#                     0.002, # regularization constant
-#                     256, # batch_size
-#                     500, # max_iterations
-#                     0.000, # dampen_by
-#                     fe)    
+    fe = CircleFeatureEng(config)
+    mimic_fa = MultiPolynomialRegression(
+                    0.01, # alpha ... #4e-5 old alpha without batching
+                    0.002, # regularization constant
+                    256, # batch_size
+                    50000, # max_iterations
+                    0.000, # dampen_by
+                    fe)    
 
     # ------------------ Guide driver RL algorithm ---------------
 
     driver = th.create_driver(config, 
                     alg = 'sarsalambda', 
-                    expl = 50,
-                    lam = 0.5,
+                    expl = 70,
+                    lam = 0.4,
                     fa=driver_fa,
                     mimic_fa=mimic_fa)
 
@@ -131,22 +128,22 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-    student_fe = CircleFeatureEng(config) 
-    student_fa = MultiPolynomialRegression(
-                    0.002, # alpha ... #4e-5 old alpha without batching
-                    0.002, # regularization constant
-                    0, # batch_size
-                    2000, # max_iterations
-                    0.000, # dampen_by
-                    student_fe)
+#     student_fe = CircleFeatureEng(config) 
+#     student_fa = MultiPolynomialRegression(
+#                     0.002, # alpha ... #4e-5 old alpha without batching
+#                     0.002, # regularization constant
+#                     0, # batch_size
+#                     2000, # max_iterations
+#                     0.000, # dampen_by
+#                     student_fe)
 
     # ------------------ Student driver RL algorithm -------------
     student = None
 
-    student = th.create_student(config, 
-                    alg = 'sarsalambda',
-                    lam = 0.8,
-                    fa=student_fa)
+#     student = th.create_student(config, 
+#                     alg = 'sarsalambda',
+#                     lam = 0.8,
+#                     fa=student_fa)
     
     # ------------------ Training -------------------
 
@@ -159,6 +156,8 @@ def main():
 
     # QLookup 4-explored 8000 episode QLambda-updated Qlookup 
     #trainer.load_from_file("439945_RC circle_DR_q_lambda_76_0.35_Qtable_a0.7_T_poly_a0.01_r0.002_b256_i50000_3ttt__")
+    # QLookup 4-explored 8000 episode SarsaLambda-updated Qlookup 
+    trainer.load_from_file("462156_RC circle_DR_sarsa_lambda_e70_l0.40_Qtable_a0.2___")
 
     trainer.train(1, 7000, 1)
 
