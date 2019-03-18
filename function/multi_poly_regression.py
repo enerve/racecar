@@ -112,10 +112,10 @@ class MultiPolynomialRegression(ValueFunction):
 
         l = len(self.steps_history_sa)
         
-        if l <= 350000:
+        if l <= 40000:
             self.steps_history_sa.append((*state, *action))
             self.steps_history_target.append(target)
-            if l == 350000:
+            if l == 40000:
                 self.logger.debug("========== Enough recorded! ==============")
         
     def store_training_data(self, fname):
@@ -143,8 +143,16 @@ class MultiPolynomialRegression(ValueFunction):
         return ids
 
     def _prepare_data(self):
-        steps_history_x = [[] for _ in range(self.num_actions)]
-        steps_history_t = [[] for _ in range(self.num_actions)]
+        torch.cuda.empty_cache()
+        
+        count = [0 for i in range(self.num_actions)]
+        for i, sa in enumerate(self.steps_history_sa):
+            (j, l, s, d, st, ac) = sa
+            ai = self.feature_eng.a_index((st, ac))
+            count[ai] += 1
+
+        SHX = [None for i in range(self.num_actions)]
+        SHT = [None for i in range(self.num_actions)]
         self.logger.debug("Preparing training data for %d items",
                           len(self.steps_history_sa))
         for i, (sa, t) in enumerate(zip(self.steps_history_sa,
@@ -157,16 +165,20 @@ class MultiPolynomialRegression(ValueFunction):
             (j, l, s, d, st, ac) = sa
             ai = self.feature_eng.a_index((st, ac))
             x = self.feature_eng.x_adjust(j, l, s, d)
-            steps_history_x[ai].append(x)
-            steps_history_t[ai].append(t)
+            if SHX[ai] is None:
+                SHX[ai] = torch.zeros(count[ai], len(x)).to(self.device)
+                SHT[ai] = torch.zeros(count[ai]).to(self.device)
+            count[ai] -= 1
+            SHX[ai][count[ai]] = x
+            SHT[ai][count[ai]] = t
             if (i+1) % 10000 == 0:
                 self.logger.debug("  prepared %d", i+1)
                 
-        return steps_history_x, steps_history_t
+        return SHX, SHT
 
     def train(self):
         # Split up the training data by action
-        steps_history_x, steps_history_t = self._prepare_data()
+        SHX, SHT = self._prepare_data()
 
         # Train each action's dataset separately
         sWcollect = None
@@ -175,18 +187,16 @@ class MultiPolynomialRegression(ValueFunction):
         before_unique = after_unique = 0
         # TODO: Use autograd?
         for ai in range(self.num_actions):
-            SHX = torch.stack(steps_history_x[ai]).to(self.device)
-            SHT = torch.tensor(steps_history_t[ai]).to(self.device)
             a = self.feature_eng.a_tuple(ai)
             self.logger.debug("Train action %s", a)
             w, stat_err, stat_reg, stat_W  = self._train_action(
-                SHX, SHT, self.W[:, ai])
+                SHX[ai], SHT[ai], self.W[:, ai])
             self.W[:, ai] = w
             self.stat_error_cost[ai].extend(stat_err)
             self.stat_reg_cost[ai].extend(stat_reg)
             
             # ---- Sample dataset for later testing/statistics
-            SHX_test, SHT_test = SHX, SHT
+            SHX_test, SHT_test = SHX[ai], SHT[ai]
             # Choose a smaller set before uniquifying
             ids = self._sample_ids(len(SHX_test), self.NUM_TEST_SAMPLES * 5)
             SHX_test, SHT_test = SHX_test[ids], SHT_test[ids]
@@ -255,7 +265,6 @@ class MultiPolynomialRegression(ValueFunction):
         stat_reg_cost = []
         stat_W = []
         
-        # TODO: decay alpha over the epochs too
         alpha = self.alpha
         iteration = self.iteration
         
@@ -333,8 +342,6 @@ class MultiPolynomialRegression(ValueFunction):
                 sum_error_cost = 0
                 sum_reg_cost = 0
                 sum_W = 0
-
-            alpha *= (1 - self.dampen_by)
 
         debug_diff_W = (debug_start_W - W)
         self.logger.debug("  trained \tN=%s \tW+=%0.2f \tE=%0.2f", N,
