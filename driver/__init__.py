@@ -19,6 +19,10 @@ from .q_fa_student import QFAStudent
 from .q_lambda_fa_driver import QLambdaFADriver
 from .q_lambda_fa_student import QLambdaFAStudent
 from .manual_driver import ManualDriver
+from .recorder import Recorder
+from .direct_recorder import DirectRecorder
+from .lambda_direct_recorder import LambdaDirectRecorder
+
 
 __all__ = ["QDriver",               # deprecated
            "QLambdaDriver",         # deprecated

@@ -16,6 +16,8 @@ class PolynomialRegression(ValueFunction):
     A function approximator that is a learned polynomial function.
     '''
     
+    MAX_TRAINING_SAMPLES = 100000
+    
     def __init__(self,
                  alpha,
                  regularization_param,
@@ -41,12 +43,12 @@ class PolynomialRegression(ValueFunction):
 
         self.num_actions = feature_eng.num_actions()
 
-        # Collectors of incoming data
-        self.steps_history_sa = []
-        self.steps_history_target = []
-        self.is_updated = False
+        self.restart_record = True
 
         self.W = feature_eng.initial_W()
+        self.train_X = []
+        self.train_T = []
+        self.train_count = 0
 
         # for stats / debugging
 
@@ -75,7 +77,6 @@ class PolynomialRegression(ValueFunction):
                                      self.max_iterations,
                                      self.feature_eng.prefix())
 
-
     def _value(self, X):
         # Calculate polynomial value X * W
         with torch.no_grad():
@@ -100,13 +101,15 @@ class PolynomialRegression(ValueFunction):
         return best_action
 
     def record(self, state, action, target):
-        ''' Record incoming data for later training '''
+        ''' Deprecated. Use add_data instead. 
+            Record incoming data for later training '''
 
-        if self.is_updated:
+        self.logger.debug("Deprecated")
+        if self.restart_record:
             # Forget old steps history
             self.steps_history_sa = []
             self.steps_history_target = []
-            self.is_updated = False
+            self.restart_record = False
 
         l = 0#len(self.steps_history_sa)
         
@@ -119,6 +122,19 @@ class PolynomialRegression(ValueFunction):
         # For stats/debugging
         #self.statQ[state + action] += target
         #self.statC[state + action] += 1
+        
+    def add_data(self, x, target):
+        if self.train_count == self.MAX_ROWS:
+            self.logger.debug("Cannot accommodate more data")
+            return
+        
+        if self.train_X is None:
+            self.train_X = torch.zeros(self.MAX_ROWS, len(x)).to(self.device)
+            self.train_T = torch.zeros(self.MAX_ROWS, 1).to(self.device)
+
+        self.train_X[self.train_count] = x
+        self.train_T[self.train_count] = target
+        self.train_count += 1
         
     def store_training_data(self, fname):
         SHSA = np.asarray(self.steps_history_sa)
@@ -152,7 +168,7 @@ class PolynomialRegression(ValueFunction):
 
         self.train()
         
-        self.is_updated = True
+        self.restart_record = True
 
     def _sample_ids(self, l, n):
         ids = torch.cuda.FloatTensor(n) if util.use_gpu else torch.FloatTensor(n)
@@ -161,18 +177,24 @@ class PolynomialRegression(ValueFunction):
 
     def train(self):
         
-        self.logger.debug("Preparing training data")
-        SHX = None
-        for i, sa_items in enumerate(self.steps_history_sa):
-            x = self.feature_eng.x_adjust(*sa_items)
-            if SHX is None:
-                SHX = torch.zeros(len(self.steps_history_sa), len(x)).to(self.device)
-            SHX[i] = x
+        if self.steps_history_sa:
+            self.logger.debug("Preparing training data")
+            SHX = None
+            N = len(self.steps_history_sa)
+            for i, sa_items in enumerate(self.steps_history_sa):
+                x = self.feature_eng.x_adjust(*sa_items)
+                if SHX is None:
+                    #TODO: preallocate a BIG but arbitrary-len SHX
+                    SHX = torch.zeros(N, len(x)).to(self.device)
+                SHX[i] = x
+    
+            SHT = torch.tensor(self.steps_history_target).to(self.device)
+        else:
+            self.logger_debug("Using collected training data")
+            SHX, SHT = self.train_X, self.train_T
+            N = self.train_count
 
-        SHT = torch.tensor(self.steps_history_target).to(self.device)
-
-        avg_target = torch.mean(SHT)
-        N = len(SHT)
+        avg_target = torch.mean(SHT[0:N])
         self.logger.debug("#training data N=%s", N)
         
         period = max(20, self.max_iterations // 100) # for stats
@@ -187,8 +209,8 @@ class PolynomialRegression(ValueFunction):
         for i in range(self.max_iterations):
             if self.batch_size == 0:
                 # Do full-batch
-                X = SHX   # N x d
-                Y = SHT   # N
+                X = SHX[0:N]   # N x d
+                Y = SHT[0:N]   # N
             else:
                 ids = self._sample_ids(N, self.batch_size)
                 X = SHX[ids]   # b x d

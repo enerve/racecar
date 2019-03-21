@@ -18,15 +18,17 @@ class SarsaLambdaFADriver(Driver):
     '''
 
     def __init__(self, config,
-                 lam,
                  gamma,
                  explorate,
+                 recorder,
                  fa,
                  mimic_fa):
         '''
         Constructor
         fa is the value function approximator that guides the episodes and
-            learns on the job, using the Q algorithm
+            learns on the job, using the Sarsa algorithm
+        mimic_fa is a value function approximator that tries to learn from the
+            guide driver, using the same algorithm.
         '''
         super().__init__(config,
                          fa,
@@ -35,19 +37,15 @@ class SarsaLambdaFADriver(Driver):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        self.lam = lam      # lookahead parameter
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
 
-        self.fa = fa
-        
+        self.recorder = recorder # records the steps and feeds the FA
+
         if self.mimic_fa:
             self.avg_delta2 = 0
             self.stat_dlm2 = []
 
-        self.eligible_mult = [(lam * gamma) ** i for i in range(self.num_junctures)]
-        self.eligible_states = [None for i in range(self.num_junctures)]
-        self.eligible_state_target = [0 for i in range(self.num_junctures)]
         
         # TODO: move N to FA?
         # N is the count of visits to state
@@ -91,11 +89,10 @@ class SarsaLambdaFADriver(Driver):
         self.actions_matched = 0
         self.total_max_actions_picked = 0
 
-        self.num_resets = 0
-        self.num_steps = 0
 
     def prefix(self):
-        pref = "sarsa_lambda_e%d_l%0.2f_" % (self.explorate, self.lam) + self.fa.prefix()
+        pref = "sarsa_lambda_e%d_" % (self.explorate) + \
+            self.recorder.prefix() + self.fa.prefix()
         if self.mimic_fa:
             pref += 'M_' + self.mimic_fa.prefix()
         return pref
@@ -155,16 +152,14 @@ class SarsaLambdaFADriver(Driver):
         total_R = 0
         steps_history = []
         
-        # Eligibility
-        num_E = 0
+        #TODO: mimic_recorder 
         
         S = environment.state_encoding()
-        A = self._pick_action(S)
         A_ = None
-        curr_value = self.fa.value(S, A)
+        A = self._pick_action(S)
         while S is not None:
             R, S_ = environment.step(A)
-            
+
             steps_history.append((S, A, R))
             I = S + A
             
@@ -175,19 +170,11 @@ class SarsaLambdaFADriver(Driver):
 
             target = R + self.gamma * Q_at_next
             
-            # Note: curr_value == self.fa.value(S, A)
-            self.eligible_states[num_E] = (S, A)
-            self.eligible_state_target[num_E] = curr_value
+            self.recorder.step(S, A, target)
 
-            delta = (target - curr_value)
-            num_E += 1
-            for i in range(num_E):
-                self.eligible_state_target[i] += delta * self.eligible_mult[
-                    num_E-i-1]
             self.C[I] += 1
             self.N[S] += 1
-            
-            self.num_steps += 1
+
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
             delta = (target - self.fa.value(S, A))
@@ -195,34 +182,16 @@ class SarsaLambdaFADriver(Driver):
             if self.mimic_fa:
                 delta2 = (target - self.mimic_fa.value(S, A))
                 self.avg_delta2 += 0.02 * (delta2 - self.avg_delta2)
-            
-            S, A, curr_value = S_, A_, Q_at_next
+
+            S, A = S_, A_
             total_R += R
 
-        self._record_eligibles(num_E)
-        
+        self.recorder.finish()
+
         steps_history.append((None, None, None))
 
         return total_R, environment, steps_history
     
-    def _record_eligibles(self, num_E):
-        for i in range(num_E):
-            S, A = self.eligible_states[i]
-            target = self.eligible_state_target[i]
-            self.fa.record(S, A, target)
-            if self.mimic_fa:
-                self.mimic_fa.record(S, A, target)
-        self.num_resets += 1
-    
-    def update_fa(self):
-        self.fa.update()
-        if self.mimic_fa:
-            self.mimic_fa.update()
-
-        # debugging
-        self.actions_matched = 0
-        self.total_max_actions_picked = 0
-
     def collect_stats(self, ep, num_episodes):
         super().collect_stats(ep, num_episodes)
         
@@ -236,11 +205,19 @@ class SarsaLambdaFADriver(Driver):
             #self.logger.debug("Portion of matched actions: %0.4f",
             #                  self.actions_matched / self.total_max_actions_picked)
 
-        if util.checkpoint_reached(ep, num_episodes // 200):
-            self.stat_e_200.append(ep)
     
 #             self.q_plotter.add_image(self.fa.plottable((2, 3, 4, 5)))
 #             self.qx_plotter.add_image(self.fa.plottable((2, 3, 4, 5), pick_max=True))
+
+    def update_fa(self):
+        self.fa.update()
+        if self.mimic_fa:
+            self.mimic_fa.update()
+
+        # debugging
+        self.actions_matched = 0
+        self.total_max_actions_picked = 0
+
 
     def report_stats(self, pref):
         super().report_stats(pref)
@@ -258,6 +235,3 @@ class SarsaLambdaFADriver(Driver):
             util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
                       ["Avg ΔQ fa", "Avg ΔQ mimic"], pref=pref+"delta",
                       ylim=None)
-
-        self.logger.debug("Average length of eligibility trace: %0.2f", 
-                          self.num_steps / self.num_resets)

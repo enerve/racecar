@@ -66,14 +66,14 @@ class EpochTrainer:
         
         recent_total_R = 0
 
+        history = [] # history of episodes, each episode a list of tuples of
+                     # state, action, reward
         ep = ep_s = self.ep
         for expl in range(num_explorations):
             for epoch in range(num_epochs):
                 # In each epoch, we first collect experience, then (re)train FA
                 self.logger.debug("====== Expl %d epoch %d =====", expl, epoch)
                 
-                history = [] # history of episodes, each episode a list of tuples of
-                             # state, action, reward
 
                 best_R = -10000
                 
@@ -146,8 +146,9 @@ class EpochTrainer:
                     # Train the student driver with the history of episodes
                     for ep_steps in history:
                         self.student.observe_episode(ep_steps)
-                        self.student.collect_stats(ep_s, total_episodes)
-                        ep_s += 1
+                        # TODO:
+                        #self.student.collect_stats(ep_s, total_episodes)
+                        #ep_s += 1
                     self.logger.debug("Student updating...")
                     self.student.update_fa()
                     self.student.live_stats()

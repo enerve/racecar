@@ -18,8 +18,8 @@ class SarsaLambdaFAStudent(Driver):
 
     def __init__(self,
                  config,
-                 lam,
                  gamma,
+                 rec,
                  fa,
                  mimic_fa):
         '''

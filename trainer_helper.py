@@ -30,10 +30,10 @@ def create_fa(config, i_fa, alpha):
         fa = QLookup(config, alpha)
     return fa
 
-def create_driver(config, alg, expl, lam, fa, mimic_fa):
-    return create_driver_i(config, ALG[alg], expl, lam, fa, mimic_fa)
+def create_driver(config, alg, expl, rec, fa, mimic_fa):
+    return create_driver_i(config, ALG[alg], expl, rec, fa, mimic_fa)
 
-def create_driver_i(config, i_alg, expl, lam, fa, mimic_fa):
+def create_driver_i(config, i_alg, expl, rec, fa, mimic_fa):
     if i_alg == 0:    
         driver = QFADriver(config,
                         1, # gamma
@@ -44,6 +44,7 @@ def create_driver_i(config, i_alg, expl, lam, fa, mimic_fa):
         driver = SarsaFADriver(config,
                         1, # gamma
                         expl, # explorate
+                        rec,
                         fa,
                         mimic_fa)
     elif i_alg == 2:
@@ -55,17 +56,18 @@ def create_driver_i(config, i_alg, expl, lam, fa, mimic_fa):
                         mimic_fa)
     elif i_alg == 3:
         driver = SarsaLambdaFADriver(config,
-                        lam, #lambda
+                        #lam, #lambda
                         1, # gamma
                         expl, # explorate
+                        rec,
                         fa,
                         mimic_fa)
     return driver
 
-def create_student(config, alg, lam, fa):
-    return create_student_i(config, ALG[alg], lam, fa)
+def create_student(config, alg, rec, fa):
+    return create_student_i(config, ALG[alg], rec, fa)
 
-def create_student_i(config, i_alg, lam, fa):
+def create_student_i(config, i_alg, rec, fa):
     if i_alg == 0:
         driver = QFAStudent(config,
                         1, # gamma
@@ -84,8 +86,8 @@ def create_student_i(config, i_alg, lam, fa):
                         None)
     elif i_alg == 3:
         driver = SarsaLambdaFAStudent(config,
-                        lam, #lambda
                         1, # gamma
+                        rec,
                         fa,
                         None)
     return driver

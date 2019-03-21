@@ -18,9 +18,11 @@ class SarsaFADriver(Driver):
     Sarsa
     '''
 
-    def __init__(self, config,
+    def __init__(self,
+                 config,
                  gamma,
                  explorate,
+                 recorder,
                  fa,
                  mimic_fa):
         '''
@@ -39,10 +41,13 @@ class SarsaFADriver(Driver):
     
         self.gamma = gamma  # weight given to predicted future
         self.explorate = explorate # Inclination to explore, e.g. 0, 10, 1000
-        
+
+        self.recorder = recorder # records the steps and feeds the FA
+
         if self.mimic_fa:
             self.avg_delta2 = 0
             self.stat_dlm2 = []
+            #TODO: recorder for mimic
         
         # TODO: move N to FA?
         # N is the count of visits to state
@@ -63,6 +68,8 @@ class SarsaFADriver(Driver):
         self.avg_delta = 0
         self.restarted = False
 
+        # Stats
+        
         self.stat_e_100 = []
         self.stat_qm = []
         self.stat_cm = []
@@ -84,7 +91,7 @@ class SarsaFADriver(Driver):
         self.total_max_actions_picked = 0
 
     def prefix(self):
-        pref = "sarsa_e%d_" % self.explorate + self.fa.prefix()
+        pref = "sarsa_e%d_" % self.explorate + self.recorder.prefix() + self.fa.prefix()
         if self.mimic_fa:
             pref += 'M_' + self.mimic_fa.prefix()
         return pref
@@ -107,9 +114,7 @@ class SarsaFADriver(Driver):
         N0 = self.explorate
         epsilon = N0 / (N0 + n)
       
-        r = random.random()
-        #self.logger.info("r : %s", r)
-        if r >= epsilon:
+        if random.random() >= epsilon:
             # Pick best
             #self.logger.debug(S)
             steer, accel = self.fa.best_action(S)
@@ -133,7 +138,6 @@ class SarsaFADriver(Driver):
         else:
             r = random.randrange(
                 self.num_steer_positions * self.num_accel_positions)
-            #self.logger.info("r2: %s", r)
             steer, accel = divmod(r, self.num_accel_positions)
         
         return (steer, accel)
@@ -153,7 +157,7 @@ class SarsaFADriver(Driver):
 
             steps_history.append((S, A, R))
             I = S + A
-            
+
             # train fa
             Q_at_next = 0
             if S_ is not None:
@@ -162,13 +166,15 @@ class SarsaFADriver(Driver):
 
             target = R + self.gamma * Q_at_next
             
-            self.fa.record(S, A, target)
+            self.recorder.step(S, A, target)
             
             if self.mimic_fa:
+                # TODO: fix with recorder
                 self.mimic_fa.record(S, A, target)
-            
+
             self.C[I] += 1
             self.N[S] += 1
+
             if S_ is not None:
                 self.Rs[S_[0]] += 0.1 * (R - self.Rs[S_[0]])
             delta = (target - self.fa.value(S, A))
@@ -179,9 +185,11 @@ class SarsaFADriver(Driver):
 
             S, A = S_, A_
             total_R += R
-            
+
+        self.recorder.finish()
+
         steps_history.append((None, None, None))
-            
+
         return total_R, environment, steps_history
     
     def collect_stats(self, ep, num_episodes):
@@ -191,7 +199,8 @@ class SarsaFADriver(Driver):
             self.stat_e_100.append(ep)
 
             self.stat_dlm.append(self.avg_delta)
-            #self.stat_dlm2.append(self.avg_delta2)
+            if self.mimic_fa:
+                self.stat_dlm2.append(self.avg_delta2)
             
             #self.logger.debug("Portion of matched actions: %0.4f",
             #                  self.actions_matched / self.total_max_actions_picked)
@@ -219,3 +228,9 @@ class SarsaFADriver(Driver):
 #         util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
 #                   ["Avg ΔQ fa", "Avg ΔQ mimic"], pref="delta",
 #                   ylim=None)
+
+        if self.mimic_fa:
+            self.mimic_fa.report_stats(pref)
+            util.plot([self.stat_dlm, self.stat_dlm2], self.stat_e_100,
+                      ["Avg ΔQ fa", "Avg ΔQ mimic"], pref=pref+"delta",
+                      ylim=None)

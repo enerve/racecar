@@ -19,8 +19,8 @@ class SarsaFAStudent(Driver):
     def __init__(self,
                  config,
                  gamma,
-                 fa,
-                 mimic_fa):
+                 recorder,
+                 fa):
         '''
         Constructor
         fa is the value function approximator that learns from the episodes
@@ -33,7 +33,9 @@ class SarsaFAStudent(Driver):
         self.logger.setLevel(logging.DEBUG)
     
         self.gamma = gamma  # weight given to predicted future
-        
+
+        self.recorder = recorder # records the steps and feeds the FA
+
         # TODO: move N to FA?
         # N is the count of visits to state
         self.N = np.zeros((self.num_junctures,
@@ -53,6 +55,8 @@ class SarsaFAStudent(Driver):
         self.avg_delta = 0
         self.restarted = False
 
+        # Stats
+        
         self.stat_e_100 = []
         self.stat_qm = []
         self.stat_cm = []
@@ -71,14 +75,14 @@ class SarsaFAStudent(Driver):
         self.stat_dlm = []
 
     def prefix(self):
-        return "sarsa_lambda_" + self.fa.prefix()
+        return "sarsa_" + self.recorder.prefix() + self.fa.prefix()
 
     def observe_episode(self, steps_history):
-        ''' Collects training data based on given episode data. 
+        ''' Learns from given episode data. 
             steps_history: list of steps, each a tuples (of S, A, R),
                 in chronological order
         '''
-        
+
         S, A, R = steps_history[0]
         i = 0
         while S is not None:
@@ -87,6 +91,7 @@ class SarsaFAStudent(Driver):
         
             I = S + A
 
+            # train fa
             Q_at_next = 0
             if S_ is not None:
                 # Find value for the next action / state taken
@@ -94,7 +99,7 @@ class SarsaFAStudent(Driver):
 
             target = R + self.gamma * Q_at_next
             
-            self.fa.record(S, A, target)
+            self.recorder.step(S, A, target)
             
             # stats
             if S_ is not None:
@@ -104,11 +109,8 @@ class SarsaFAStudent(Driver):
 
             S, A, R = S_, A_, R_
             
-        return
+        self.recorder.finish()
                 
-    def update_fa(self):
-        self.fa.update()
-    
     def collect_stats(self, ep, num_episodes):
         super().collect_stats(ep, num_episodes)
         
@@ -117,9 +119,13 @@ class SarsaFAStudent(Driver):
 
             self.stat_dlm.append(self.avg_delta)
 
+    def update_fa(self):
+        self.fa.update()
+    
     def report_stats(self, pref):
         super().report_stats(pref)
         
         util.plot([self.stat_dlm], self.stat_e_100,
                   ["Avg ΔQ student"], pref=pref+"delta",
                   ylim=None)
+        #self.fa.report_stats(pref)

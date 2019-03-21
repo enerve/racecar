@@ -19,6 +19,7 @@ class MultiPolynomialRegression(ValueFunction):
     polynomial regressions
     '''
     
+    MAX_TRAINING_SAMPLES = 100000    
     NUM_TEST_SAMPLES = 200
     
     def __init__(self,
@@ -50,11 +51,12 @@ class MultiPolynomialRegression(ValueFunction):
         
         self.num_actions = feature_eng.num_actions()
 
-        self.steps_history_sa = []
-        self.steps_history_target = []
-        self.is_updated = False
+        self.restart_record = True
         
         self.W = feature_eng.initial_W()
+        self.train_X = []
+        self.train_T = []
+        self.train_count = 0
 
         # for stats / debugging
 
@@ -102,13 +104,15 @@ class MultiPolynomialRegression(ValueFunction):
         return self.feature_eng.a_tuple(i)
 
     def record(self, state, action, target):
-        ''' Record incoming data for later training '''
+        ''' Deprecated. Use add_data instead. 
+            Record incoming data for later training '''
         
-        if self.is_updated:
+        self.logger.debug("Deprecated")
+        if self.restart_record:
             # Forget old steps history
             self.steps_history_sa = []
             self.steps_history_target = []
-            self.is_updated = False
+            self.restart_record = False
 
         l = len(self.steps_history_sa)
         
@@ -117,6 +121,19 @@ class MultiPolynomialRegression(ValueFunction):
             self.steps_history_target.append(target)
             if l == 40000:
                 self.logger.debug("========== Enough recorded! ==============")
+        
+    def add_data(self, x, target, action):
+        if self.train_count == self.MAX_ROWS:
+            self.logger.debug("Cannot accommodate more data")
+            return
+        
+        if self.train_X is None:
+            self.train_X = torch.zeros(self.MAX_ROWS, len(x)).to(self.device)
+            self.train_T = torch.zeros(self.MAX_ROWS, 1).to(self.device)
+
+        self.train_X[self.train_count] = x
+        self.train_T[self.train_count] = target
+        self.train_count += 1
         
     def store_training_data(self, fname):
         SHSA = np.asarray(self.steps_history_sa)
@@ -135,7 +152,7 @@ class MultiPolynomialRegression(ValueFunction):
         self.train()
         self.test()
         
-        self.is_updated = True
+        self.restart_record = True
 
     def _sample_ids(self, l, n):
         ids = torch.cuda.FloatTensor(n) if util.use_gpu else torch.FloatTensor(n)

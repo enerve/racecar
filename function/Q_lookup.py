@@ -49,7 +49,7 @@ class QLookup(ValueFunction):
         steer, accel = np.unravel_index(np.argmax(As, axis=None), As.shape)
         return steer, accel
 
-    def record(self, state, action, target):
+    def add_data(self, state, action, target):
         delta = target - self.value(state, action)
         #self.episode_history.append((state + action, delta))
         
