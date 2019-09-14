@@ -4,14 +4,12 @@ Created on 12 Mar 2019
 @author: enerve
 '''
 
-import util
-from function import FeatureEng
-
 import math
 import torch
 
+from .racecar_feature_eng import RacecarFeatureEng
 
-class CircleSAFeatureEng(FeatureEng):
+class CircleSAFeatureEng(RacecarFeatureEng):
     '''
     Feature engineering for States and Actions of circular track
     '''
@@ -24,20 +22,8 @@ class CircleSAFeatureEng(FeatureEng):
 
     def __init__(self,
                  config):
-        '''
-        Constructor
-        '''
-        
-        # states
-        self.num_junctures = config.NUM_JUNCTURES
-        self.num_lanes = config.NUM_LANES
-        self.num_directions = config.NUM_DIRECTIONS 
-        self.num_speeds = config.NUM_SPEEDS
-        # actions
-        self.num_steer_positions = config.NUM_STEER_POSITIONS
-        self.num_accel_positions = config.NUM_ACCEL_POSITIONS
-        
-        self.device = torch.device('cuda' if util.use_gpu else 'cpu')
+
+        super().__init__(config)
 
         # Hard-coded normalization params for the RaceCar state parameters
         
@@ -142,13 +128,3 @@ class CircleSAFeatureEng(FeatureEng):
                     x = torch.ger(x, x).flatten()
 
         return x
-    
-    def a_index(self, a_tuple):
-        steer, accel = a_tuple
-        return self.num_accel_positions * steer + accel
-
-    def a_tuple(self, a_index):
-        return (a_index // self.num_accel_positions,
-                a_index % self.num_accel_positions)
-
-

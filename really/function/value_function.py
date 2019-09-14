@@ -36,12 +36,6 @@ class ValueFunction(object):
     def report_stats(self, pref):
         pass
     
-    def store_training_data(self, fname):
-        pass
-
-    def load_training_data(self, fname, subdir):
-        pass
-
     def save_model(self, pref=""):
         pass
 

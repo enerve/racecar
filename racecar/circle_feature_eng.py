@@ -4,14 +4,12 @@ Created on 14 Feb 2019
 @author: enerve
 '''
 
-import util
-from function import FeatureEng
-
 import math
 import torch
 
+from .racecar_feature_eng import RacecarFeatureEng
 
-class CircleFeatureEng(FeatureEng):
+class CircleFeatureEng(RacecarFeatureEng):
     '''
     Feature engineering for States of circular track
     '''
@@ -24,20 +22,8 @@ class CircleFeatureEng(FeatureEng):
 
     def __init__(self,
                  config):
-        '''
-        Constructor
-        '''
         
-        # states
-        self.num_junctures = config.NUM_JUNCTURES
-        self.num_lanes = config.NUM_LANES
-        self.num_directions = config.NUM_DIRECTIONS 
-        self.num_speeds = config.NUM_SPEEDS
-        # actions
-        self.num_steer_positions = config.NUM_STEER_POSITIONS
-        self.num_accel_positions = config.NUM_ACCEL_POSITIONS
-        
-        self.device = torch.device('cuda' if util.use_gpu else 'cpu')
+        super().__init__(config)
 
         # Hard-coded normalization params for the RaceCar state parameters
         
@@ -78,9 +64,6 @@ class CircleFeatureEng(FeatureEng):
         self.shift = torch.Tensor(shift_list).to(self.device)
         self.scale = torch.Tensor(scale_list).to(self.device)
         self.num_inputs = len(shift_list)
-        
-    def num_actions(self):
-        return self.num_steer_positions * self.num_accel_positions
         
     def prefix(self):
         return '%d%s%s%s' % (self.POLY_DEGREE,
@@ -131,12 +114,3 @@ class CircleFeatureEng(FeatureEng):
 
         return x
     
-    def a_index(self, a_tuple):
-        steer, accel = a_tuple
-        return self.num_accel_positions * steer + accel
-
-    def a_tuple(self, a_index):
-        return (a_index // self.num_accel_positions,
-                a_index % self.num_accel_positions)
-
-

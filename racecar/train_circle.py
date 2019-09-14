@@ -6,18 +6,22 @@ Created on Sep 14, 2018
 
 import logging
 
-from car import Car
-from track import CircleTrack
-from epoch_trainer import EpochTrainer
-from trainer import Trainer
-from driver import *
-from function import *
-from circle_feature_eng import CircleFeatureEng
-from circle_sa_feature_eng import CircleSAFeatureEng
-import trainer_helper as th
-import cmd_line
-import log
-import util
+from really.epoch_trainer import EpochTrainer
+from really.agent import *
+from really.function import *
+from really import cmd_line
+from really import log
+from really import util
+
+from racecar.car import Car
+from racecar.track import CircleTrack
+from racecar.episode_factory import EpisodeFactory
+from racecar.circle_feature_eng import CircleFeatureEng
+from racecar.circle_sa_feature_eng import CircleSAFeatureEng
+from racecar.racecar_es_lookup import RacecarESLookup
+from racecar.racecar_explorer import RacecarExplorer
+from racecar.evaluator import Evaluator
+import racecar.trainer_helper as th
 
 import numpy as np
 import random
@@ -28,10 +32,10 @@ def main():
     args = cmd_line.parse_args()
 
     util.init(args)
-    util.pre_problem = 'RC circle'
+    util.pre_problem = 'RC2 circle'
 
     logger = logging.getLogger()
-    log.configure_logger(logger, "RaceCar")
+    log.configure_logger(logger, "RaceCar2")
     logger.setLevel(logging.DEBUG)
     
     # -------------- Configure track
@@ -57,14 +61,24 @@ def main():
     seed = 123
     random.seed(seed)
     np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
 
-    # ------------------ Guide driver FA -----------------
-    driver_fa = QLookup(config,
-                        alpha=0.2)
+    NUM_NEW_EPISODES = 7000
+    NUM_EPOCHS = 1
     
-#     driver_fa =  PolynomialRegression(
+    logger.debug("NUM_NEW_EPISODES=%d\t NUM_EPOCHS=%d", NUM_NEW_EPISODES, NUM_EPOCHS)
+
+    episode_factory = EpisodeFactory(config, track, car)
+
+    circle_fe = CircleFeatureEng(config)
+
+    agent_fa = QLookup(config,
+                       alpha=0.2,
+                       feature_eng=circle_fe)
+    
+#     agent_fa =  PolynomialRegression(
 #                     0.002, # alpha ... #4e-5 old alpha without batching
 #                     0.5, # regularization constant
 #                     256, # batch_size
@@ -75,126 +89,68 @@ def main():
 #                     NUM_DIRECTIONS,
 #                     NUM_STEER_POSITIONS,
 #                     NUM_ACCEL_POSITIONS)
-#     fe = CircleFeatureEng(config)
-#     driver_fa = MultiPolynomialRegression(
+#     agent_fa = MultiPolynomialRegression(
 #                     0.0001, # alpha ... #4e-5 old alpha without batching
 #                     0.5, # regularization constant
 #                     256, # batch_size
 #                     200, # max_iterations
 #                     0.000, # dampen_by
-#                     fe)
+#                     circle_fe)
 
-    # ------------------ Mimic FA -----------------
-    mimic_fa = None
+    es = RacecarESLookup(config,
+                  explorate=70,
+                  fa=agent_fa)
+    explorer = RacecarExplorer(config, es)
 
-#     fe = CircleSAFeatureEng(config)
-#     mimic_fa = PolynomialRegression(
-#                     0.01, # alpha ... #4e-5 old alpha without batching
-#                     0.002, # regularization constant
-#                     256, # batch_size
-#                     100000, # max_iterations
-#                     fe)
-
-    fe = CircleFeatureEng(config)
-    mimic_fa = MultiPolynomialRegression(
-                    0.01, # alpha ... #4e-5 old alpha without batching
-                    0.002, # regularization constant
-                    256, # batch_size
-                    50000, # max_iterations
-                    0.000, # dampen_by
-                    fe)    
-
-    # ------------------ Guide driver RL algorithm ---------------
-
-    driver = th.create_driver(config, 
-                    alg = 'sarsalambda', 
-                    expl = 70,
+    learner = th.create_agent(config, 
+                    alg = 'sarsalambda',
                     lam = 0.4,
-                    fa=driver_fa,
-                    mimic_fa=mimic_fa)
+                    fa=agent_fa)
 
+    training_data_collector = FADataCollector(agent_fa)
+    validation_data_collector = FADataCollector(agent_fa)
 
-    # ------------------ Student driver FA -----------------
-#     student_fa = QLookup(0.7,  # alpha
-#                     config)
-#     student_fa =  PolynomialRegression(
-#                     0.05, # alpha ... #4e-5 old alpha without batching
-#                     0, # regularization constant
-#                     256, # batch_size
-#                     1000, #250, # max_iterations
-#                     NUM_JUNCTURES,
-#                     NUM_LANES,
-#                     NUM_SPEEDS,
-#                     NUM_DIRECTIONS,
-#                     NUM_STEER_POSITIONS,
-#                     NUM_ACCEL_POSITIONS)
-#     student_fe = CircleFeatureEng(config) 
-#     student_fa = MultiPolynomialRegression(
-#                     0.002, # alpha ... #4e-5 old alpha without batching
-#                     0.002, # regularization constant
-#                     0, # batch_size
-#                     2000, # max_iterations
-#                     0.000, # dampen_by
-#                     student_fe)
-
-    # ------------------ Student driver RL algorithm -------------
-    student = None
-
-#     student = th.create_student(config, 
-#                     alg = 'sarsalambda',
-#                     lam = 0.8,
-#                     fa=student_fa)
-    
     # ------------------ Training -------------------
 
-    trainer = Trainer(driver, track, car)
-#     trainer.train(20000)
-    
-    trainer = EpochTrainer(driver, track, car, student)
+    test_agent = FAAgent(config, agent_fa)
+    evaluator = Evaluator(episode_factory, test_agent)
+
+    trainer = EpochTrainer(episode_factory, [explorer], learner, 
+                           training_data_collector,
+                           validation_data_collector,
+                           evaluator,
+                           explorer.prefix() + "_" + learner.prefix())
     
     #trainer.load_from_file("")
 
     # QLookup 4-explored 8000 episode QLambda-updated Qlookup 
     #trainer.load_from_file("439945_RC circle_DR_q_lambda_76_0.35_Qtable_a0.7_T_poly_a0.01_r0.002_b256_i50000_3ttt__")
     # QLookup 4-explored 8000 episode SarsaLambda-updated Qlookup 
-    trainer.load_from_file("462156_RC circle_DR_sarsa_lambda_e70_l0.40_Qtable_a0.2___")
+    #trainer.load_from_file("462156_RC circle_DR_sarsa_lambda_e70_l0.40_Qtable_a0.2___")
 
-    trainer.train(1, 7000, 1)
-
-#     driver.mimic_fa = False
-#     trainer.train(1, 8000, 3)
-    trainer.save_to_file()
-#     driver.mimic_fa = mimic_fa
-#     trainer.train(1, 8000, 1)
+    trainer.train(NUM_NEW_EPISODES, NUM_EPOCHS, 1)
+    #trainer.save_to_file()
     
+    explorer.store_episode_history("explorer")
+    es.store_exploration_state()
+    training_data_collector.store_last_dataset("final_t")
+    validation_data_collector.store_last_dataset("final_v")
+    agent_fa.save_model("v3")
+
     trainer.report_stats()
-    
-    #     # Load poly training data and train
-    #     subdir = "71177_RC circle_sarsa_lambda_fa_student_1.0_1.0_" # Qlambda driver 
-    #                                                                 # 1 epoch 8000
-    #     fa_Poly_S.load_training_data("student_train", subdir)
-    #     #fa_Poly_S.describe_training_data()
-    #     fa_Poly_S.train()
-    #     fa_Poly_S.report_stats()
+    trainer.save_stats()
 
-    if True:
-        t_R, b_E, _ = driver.run_best_episode(track, car, False)
-        logger.debug("Driver best episode total R = %0.2f time=%d", t_R,
-                     b_E.total_time_taken())
-        #b_E.play_movie(pref="bestmovie")
+    replay_agent = FAExplorer(config, ESBest(config, agent_fa))
+    episode = episode_factory.new_episode([replay_agent])
+    episode.start_recording()
+    episode.run()
     
-        if driver.mimic_fa:
-            t_R, b_E, _ = driver.run_best_episode(track, car, True)
-            logger.debug("Mimic best episode total R = %0.2f time=%d", t_R,
-                         b_E.total_time_taken())
-            b_E.play_movie(pref="bestmovie_mimic")
+    logger.debug("Driver best episode total R = %0.2f time=%d", 
+                 replay_agent.G,
+                 episode.total_time_taken())
+    episode.report_history()
+    episode.play_movie(show=True, pref="bestmovie")#pref="bestmovie_%s" % pref)
     
-        if student:
-            t_R, b_E, _ = student.run_best_episode(track, car)
-            logger.debug("Student best episode total R = %0.2f time=%d", t_R,
-                     b_E.total_time_taken())
-            b_E.play_movie(pref="bestmovie_student")
-
 
 
 if __name__ == '__main__':

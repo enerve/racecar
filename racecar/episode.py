@@ -8,10 +8,10 @@ import logging
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-import util
+from really import util
+from really.episode import Episode as Ep
 
-
-class Environment(object):
+class Episode(Ep):
     '''
     Environment is instantiated for a 1-episode run of the given Car on the
     given Track. It is responsible for interpreting a driver's action,
@@ -32,34 +32,47 @@ class Environment(object):
     R_finishline = 0
     R_milestone = 100
     
-    def __init__(self, track, car, num_junctures, should_record=False):
+    def __init__(self, config, driver, track, car):
         '''
         Constructor
         '''
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
 
+        self.driver = driver
+
         self.track = track
         self.car = car
 
         # Junctures are where actions can be taken
-        self.num_junctures = num_junctures
+        self.num_junctures = config.NUM_JUNCTURES
         # Milestones are where rewards may be given
-        self.num_milestones = track.num_milestones
+        self.num_milestones = config.NUM_MILESTONES
         
+        self.should_record = False
+        
+    def start_recording(self):
+        self.should_record = True
+    
+    def run(self):
         self.curr_juncture = 0
         self.curr_milestone = 0
         self.curr_time = 0
 
-        self.car.restart(track, should_record)
+        self.car.restart(self.track, self.should_record)
 
         self.track_anchor = self.track.anchor(self.car.location)
         self.reached_finish = False
         self.last_progress = 0
-        #self.logger.debug("%s", self.state_encoding())
         
-        self.should_record = should_record
-        
+        S = self.state_encoding()
+        self.driver.init_episode(S)
+        while S is not None:
+            A = self.driver.next_action()
+            R, S = self.step(A)
+            self.driver.see_outcome(R, S)
+        self.driver.episode_over()
+
     def step(self, A):
         ''' Performs a full step, using given actions
             Returns reward and next state

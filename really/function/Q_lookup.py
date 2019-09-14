@@ -6,7 +6,8 @@ Created on Nov 3, 2018
 
 import logging
 import numpy as np
-import util
+
+from really import util
 from . import ValueFunction
 
 class QLookup(ValueFunction):
@@ -16,13 +17,16 @@ class QLookup(ValueFunction):
 
     def __init__(self,
                  config,
-                 alpha):
+                 alpha,
+                 feature_eng):
         '''
         Constructor
         '''
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
+
+        self.feature_eng = feature_eng
 
         # Q is the learned value of a state/action
         self.Q = np.zeros((config.NUM_JUNCTURES,
@@ -42,14 +46,20 @@ class QLookup(ValueFunction):
         return 'Qtable_a%s_' % (self.alpha)
 
     def value(self, state, action):
-        return self.Q[state + action]
+        return self.Q[tuple(state) + tuple(action)]
 
     def best_action(self, S):
-        As = self.Q[S]
+        As = self.Q[tuple(S)]
         steer, accel = np.unravel_index(np.argmax(As, axis=None), As.shape)
-        return steer, accel
+        return (steer, accel), As[steer, accel], As.tolist()
+
+    #TODO: Should ideally be in FeatureEng    
+    def random_action(self, state):
+        return self.feature_eng.random_action(state)
 
     def record(self, state, action, target):
+        # TODO: Move this logic to "update"
+        
         delta = target - self.value(state, action)
         #self.episode_history.append((state + action, delta))
         
@@ -61,7 +71,7 @@ class QLookup(ValueFunction):
         rt = 0.01
         self.error_running_avg = rt * delta **2 + (1 - rt) * self.error_running_avg
 
-    def update(self):
+    def update(self, data_collector, validation_data_collector):
         #for sa, delta in self.episode_history:
         #    self.Q[sa] += self.alpha * delta
             
@@ -85,3 +95,14 @@ class QLookup(ValueFunction):
     def load_model(self, load_subdir, pref=""):
         self.logger.debug("Loading Q from: %s", load_subdir)
         self.Q = util.load(pref+"Q", load_subdir)
+
+    def save_stats(self, pref=""):
+        # TODO
+        pass
+
+    def load_stats(self, subdir, pref=""):
+        # TODO
+        pass
+
+    def report_stats(self, pref=""):
+        pass

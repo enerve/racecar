@@ -5,66 +5,51 @@ Created on Nov 6, 2018
 '''
 
 import logging
-import numpy as np
 import time
-import util
+
+from really import util
 
 class EpochTrainer:
     ''' A class that helps train the RL agent in stages, collecting episode
         history for an epoch and then training on that data.
     '''
 
-    def __init__(self, driver, track, car, student=None):
-        self.driver = driver
-        self.student = student
-        self.track = track
-        self.car = car
+    def __init__(self, episode_factory, explorer_list, learner, training_data_collector,
+                 validation_data_collector, evaluator, prefix):
+        self.episode_factory = episode_factory
+        self.explorer_list = explorer_list #TODO: dict with keys
+        self.explorer = explorer_list[0]
+        self.learner = learner
+        self.training_data_collector = training_data_collector
+        self.validation_data_collector = validation_data_collector
+        self.evaluator = evaluator
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
     
-        util.pre_driver_alg = self.driver.prefix()
-        self.logger.debug("Driver: %s", util.pre_driver_alg)
-        if self.student:
-            util.pre_student_alg = self.student.prefix()
-            self.logger.debug("Student: %s", util.pre_student_alg)
+        util.pre_agent_alg = prefix
+        self.logger.debug("Agent: %s", util.pre_agent_alg)
 
-        # track #steps/time-taken by bestpath, as iterations progress
-        self.stat_bestpath_times = []
-        # track recent average of rewards collected, as iterations progress
-        self.stat_recent_total_R = []
-        self.stat_bestpath_R = []
-        self.stat_bestpath_juncture = []
-        self.stat_e_bp = []
-
-        # track mimicFA performance
-        self.stat_mimic_bestpath_times = []
-        # track mimicFA recent average of rewards collected, as iterations progress
-        self.stat_mimic_bestpath_R = []
-
-        # track student peformance
-        self.stat_student_bestpath_times = []
-        # track recent average of rewards collected, as iterations progress
-        self.stat_student_bestpath_R = []
-        
-        self.stat_m = []#[] for _ in range(driver.num_junctures + 1)]
         self.stat_e_1000 = []
         
         self.ep = 0
 
-    def train(self, num_epochs, num_episodes_per_epoch, num_explorations = 1):
+    def train(self, num_episodes_per_epoch, num_epochs, num_explorations = 1,
+              debug_run_first_epoch_data_only = False):
         
-        total_episodes = num_epochs * num_episodes_per_epoch * num_explorations
-
-        # track counts of last juncture reached
-        smooth = total_episodes // 100
-        count_m = np.zeros((smooth, self.driver.num_junctures + 1), dtype=np.int32)
-        Eye = np.eye(self.driver.num_junctures + 1)
-            
-        self.logger.debug("Starting for %d expls x %d epochs x %d episodes",
-                          num_explorations, num_epochs, num_episodes_per_epoch)
+        total_episodes = num_episodes_per_epoch * num_epochs * num_explorations
+           
+        self.logger.debug("Starting for %d episodes x %d epochs x %d expls",
+                          num_episodes_per_epoch, num_epochs, num_explorations)
         start_time = time.clock()
         
-        recent_total_R = 0
+        totaltime_explore = 0
+        totaltime_process = 0
+        totaltime_train = 0
+        
+        #self.end_states = {}
+
+        # Evaluate starting performance
+        self.evaluator.evaluate(0)
 
         ep = ep_s = self.ep
         for expl in range(num_explorations):
@@ -72,192 +57,140 @@ class EpochTrainer:
                 # In each epoch, we first collect experience, then (re)train FA
                 self.logger.debug("====== Expl %d epoch %d =====", expl, epoch)
                 
-                history = [] # history of episodes, each episode a list of tuples of
-                             # state, action, reward
-
-                best_R = -10000
+                start_explore_time = time.clock()
                 
-                for ep_ in range(num_episodes_per_epoch):
-                    total_R, environment, ep_steps = self.driver.run_episode(
-                        self.track, self.car)
-                    history.append(ep_steps)
-            
-                    count_m[ep % smooth] = Eye[environment.curr_juncture]
-                    
-                    if environment.curr_juncture >= 6:
-                        if total_R > best_R:
-                            self.logger.debug("Ep %d  Juncture %d reached with tR=%d T=%d",
-                                              ep, environment.curr_juncture, total_R,
-                                              environment.total_time_taken())
-                            best_R = total_R
-                            
-                    # TODO: fix
-                    self.driver.collect_stats(ep, total_episodes)
-                            
-            
-                    if util.checkpoint_reached(ep, total_episodes // 200):
-                        self.stat_e_1000.append(ep)
-                        self.stat_m.append(count_m.sum(axis=0))
-                        #for sm, c in zip(stat_m, count_m.sum(axis=0)):
-                        #    sm.append(c)
-                            #stat_ep[i].append(ep)
-                        #count_m = np.zeros((driver.num_junctures + 1), dtype=np.int32)
-            
+                if not debug_run_first_epoch_data_only or epoch == 0:
+                    # Run games to collect new data               
+                    for ep_ in range(num_episodes_per_epoch):
+                        # Create racecar_episode for a single episode
+                        episode = self.episode_factory.new_episode(self.explorer_list)
                         
-                    len_bp_split = (total_episodes // 100)
-                    recent_total_R += (total_R - recent_total_R) * 10 / len_bp_split
-                    if (ep + 1) % len_bp_split == 0:
-                        bestpath_R, bestpath_env, _ = self.driver.run_best_episode(
-                            self.track, self.car)
-                        self.stat_bestpath_times.append(bestpath_env.total_time_taken() 
-                                                   if bestpath_env.has_reached_finish() 
-                                                   else 500)
-                        self.stat_bestpath_R.append(bestpath_R)
-                        self.stat_e_bp.append(ep)
-                        self.stat_recent_total_R.append(recent_total_R)
-                        self.stat_bestpath_juncture.append(bestpath_env.curr_juncture)
-                        if self.driver.mimic_fa:
-                            bestpath_R, bestpath_env, _ = self.driver.run_best_episode(
-                                self.track, self.car, use_mimic=True)
-                            self.stat_mimic_bestpath_times.append(bestpath_env.total_time_taken() 
-                                                       if bestpath_env.has_reached_finish() 
-                                                       else 500)
-                            self.stat_mimic_bestpath_R.append(bestpath_R)
+                        episode.run()
+    
+                        if ep_ % 10 == 0:
+                            # Save for validation
+                            self.explorer.save_episode_for_testing()
+                            #TODO: self.opponent.save_game_for_testing()
+                        else:
+                            # Use for training
+                            self.explorer.save_episode_for_training()
+                            #TODO: self.opponent.save_game_for_training()
+    
+                        #stS = np.array2string(S, separator='')
+                        #if stS in self.end_states:
+                        #    self.end_states[stS] += 1
+                        #else:
+                        #    self.end_states[stS] = 1
+    
+                        self.explorer.collect_stats(episode,
+                                                    ep, total_episodes)
+                        #TODO: self.opponent.collect_stats(episode, ep, total_episodes)
+                
+                        if util.checkpoint_reached(ep, 1000):
+                            self.stat_e_1000.append(ep)
+                            self.logger.debug("Ep %d ", ep)
 
-                        if self.student:
-                            bestpath_R, bestpath_env, _ = self.student.run_best_episode(
-                                self.track, self.car)
-                            self.stat_student_bestpath_times.append(
-                                bestpath_env.total_time_taken() if 
-                                bestpath_env.has_reached_finish() else 500)
-                            self.stat_student_bestpath_R.append(bestpath_R)
-                        
-            
-                    if util.checkpoint_reached(ep, 1000):
-                        self.logger.debug("Ep %d ", ep)
-                        
-                    ep += 1
-                
-                
-                self.driver.update_fa()
-                
-                if self.student:
-                    self.logger.debug("Student observing...")
-                    # Train the student driver with the history of episodes
-                    for ep_steps in history:
-                        self.student.observe_episode(ep_steps)
-                        self.student.collect_stats(ep_s, total_episodes)
-                        ep_s += 1
-                    self.logger.debug("Student updating...")
-                    self.student.update_fa()
-                    self.student.live_stats()
-            
-            self.driver.restart_exploration(1) #(1.5)
+                        ep += 1
 
-        self.logger.debug("Completed training in %d seconds", time.clock() - start_time)
+                    self.training_data_collector.reset_dataset()
+                    self.validation_data_collector.reset_dataset()
+
+                else:
+                    # Reuse existing data
+                    self.training_data_collector.replay_dataset()
+                    self.validation_data_collector.replay_dataset()
+
+                start_process_time = time.clock()
+                totaltime_explore += (start_process_time - start_explore_time)
+                
+                self.logger.debug("-------- processing ----------")
+                self.logger.debug("Learning from explorer history")
+                self.learner.process(self.explorer.get_episodes_history(),
+                                     self.training_data_collector,
+                                     "explorer train")
+                self.training_data_collector.report_collected_dataset()
+                #self.learner.plot_last_hists()
+                self.learner.process(self.explorer.get_test_episodes_history(),
+                                     self.validation_data_collector,
+                                     "explorer val")
+
+#                 self.logger.debug("Learning from opponent history")
+#                 self.learner.process(self.opponent.get_episodes_history(),
+#                                      self.training_data_collector,
+#                                      "opponent train")
+#                 #self.learner.plot_last_hists()
+#                 #self.learner.collect_last_hists()
+#                 self.learner.process(self.opponent.get_test_episodes_history(),
+#                                      self.validation_data_collector,
+#                                      "opponent val")
+
+                start_training_time = time.clock()
+                totaltime_process += (start_training_time - start_process_time)
+
+                self.logger.debug("-------- training ----------")
+                self.learner.learn(self.training_data_collector,
+                                   self.validation_data_collector)
+
+                totaltime_train += (time.clock() - start_training_time)
+                
+                # Sacrifice some data for the sake of GPU memory
+                if len(self.explorer.get_episodes_history()) >= 15000:#20000
+                    #TODO: process opponent as well
+                    self.logger.debug("Before: %d",
+                                      len(self.explorer.get_episodes_history()))
+                    self.explorer.decimate_history()
+                    #self.opponent.decimate_history()
+                    self.logger.debug("After: %d", 
+                                      len(self.explorer.get_episodes_history()))
+                
+                self.evaluator.evaluate(ep)
+
+                self.logger.debug("  Clock: %d seconds", time.clock() - start_time)
+
+            #self.explorer.restart_exploration(1)
+
+        self.logger.debug("Completed training in %0.1f minutes", (time.clock() - start_time)/60)
+        self.logger.debug("   Total time for Explore: %0.1f minutes", (totaltime_explore)/60)
+        self.logger.debug("   Total time for Process: %0.1f minutes", (totaltime_process)/60)
+        self.logger.debug("   Total time for Train:   %0.1f minutes", (totaltime_train)/60)
     
         self.ep = ep
         
-        return (self.stat_bestpath_times, self.stat_e_bp,
-                self.stat_bestpath_R, self.stat_bestpath_juncture)
-    
+
     def load_from_file(self, subdir):
-        self.driver.load_model(subdir)
+        self.learner.load_model(subdir)
         #self.load_stats(subdir)
 
     def save_to_file(self, pref=''):
         # save learned values to file
-        self.driver.save_model(pref=pref)
+        self.learner.save_model(pref=pref)
         
         # save stats to file
         self.save_stats(pref=pref)        
     
-    def save_stats(self, pref=None):
-        self.driver.save_stats(pref=pref)
+    def save_stats(self, pref=""):
+        self.explorer.save_stats(pref="a_" + pref)
+        #TODO: self.opponent.save_stats(pref="o_" + pref)
+        self.learner.save_stats(pref="l_" + pref)
+        self.evaluator.save_stats(pref="t_" + pref)
+
+        self.learner.save_hists(["explorer train"])#TODO: , "opponent train"])
+        self.learner.write_hist_animation("explorer train")
         
-        A = np.asarray([
-            self.stat_bestpath_times,
-            self.stat_recent_total_R,
-            self.stat_e_bp,
-            self.stat_bestpath_R,
-            ], dtype=np.float)
-        util.dump(A, "statsA", pref)
-    
-        B = np.asarray(self.stat_m, dtype=np.float)
-        util.dump(B, "statsB", pref)
-    
-        C = np.asarray(self.stat_e_1000, dtype=np.float)
-        util.dump(C, "statsC", pref)
         
-        # TODO: Save and load #episodes done in total
-        
-    def load_stats(self, subdir, pref=None):
-        self.driver.load_stats(subdir, pref)
-    
+    def load_stats(self, subdir, pref=""):
         self.logger.debug("Loading stats...")
-        
-        A = util.load("statsA", subdir, pref)
-        self.stat_bestpath_times = A[0]
-        self.stat_recent_total_R = A[1]
-        self.stat_e_bp = A[2]
-        self.stat_bestpath_R = A[3]
-        
-        B = util.load("statsB", subdir, pref)
-        self.stat_m = B
-        
-        C = util.load("statsC", subdir, pref)
-        self.stat_e_1000 = C
+
+        self.explorer.load_stats(subdir, pref="a_" + pref)
+        #TODO: self.opponent.load_stats(subdir, pref="o_" + pref)
+        self.learner.load_stats(subdir, pref="l_" + pref)
+        self.evaluator.load_stats(subdir, pref="t_" + pref)
+    
+        #self.learner.load_hists(subdir)
     
     def report_stats(self, pref=""):
-        self.driver.report_stats(pref="g_" + pref)
+        self.explorer.report_stats(pref="a_" + pref)
+        #TODO: self.opponent.report_stats(pref="o_" + pref)
+        self.learner.report_stats(pref="l_" + pref)
+        self.evaluator.report_stats(pref="t_" + pref)
         
-        if self.student:
-            self.student.report_stats(pref="s_" + pref)
-        util.plot([[x for x in self.stat_bestpath_times],
-                   self.stat_recent_total_R, self.stat_bestpath_R],
-                  self.stat_e_bp,
-                  ["Finish time by best-action path", "Recent avg total reward",
-                   "Reward for best-action path"],
-                  title="Performance over time",
-                  pref="bpt")
-        if self.driver.mimic_fa:
-            util.plot([[x for x in self.stat_mimic_bestpath_times],
-                       self.stat_recent_total_R, self.stat_mimic_bestpath_R],
-                      self.stat_e_bp,
-                      ["Finish time by best-action path", "Recent avg total reward",
-                       "Reward for best-action path"],
-                      title="Mimic Performance over time",
-                      pref="m_bpt")
-        if self.student:
-            util.plot([self.stat_student_bestpath_times,
-                       self.stat_recent_total_R, self.stat_student_bestpath_R],
-                      self.stat_e_bp,
-                      ["Finish time by best-action path", "Recent avg total reward",
-                       "Reward for best-action path"],
-                      title="Student Performance over time",
-                      pref="s_bpt")
-        
-        # Max juncture reached
-    #     for i in range(len(stat_m)):
-    #         lines.append(stat_m[i])
-        S_m = np.array(self.stat_m).T
-        labels = ["ms %d" % i for i in range(len(S_m))]
-        util.plot(S_m, self.stat_e_1000, labels, "Max juncture reached", pref="ms")
-    
-    def play_best(self, should_play_movie=True, pref=""):
-        #logger.debug("Playing best path")
-        environment = self.best_environment()
-        environment.report_history()
-        environment.play_movie(show=should_play_movie, pref="bestmovie_%s" % pref)
-        return environment
-    
-    def show_best(self, show=True, pref=""):
-        #logger.debug("Playing best path")
-        environment = self.best_environment()
-        environment.report_history()
-        environment.show_path(show=show, pref="bestpath_%s" % pref)
-        return environment
-    
-    def best_environment(self):
-        total_R, environment, _ = self.driver.run_best_episode(self.track, self.car)
-        return environment

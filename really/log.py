@@ -8,7 +8,7 @@ import logging
 import sys
 import time
 
-import util
+from really import util
 
 def configure_logger(logger, name):
     # create file handler which logs even debug messages
@@ -18,6 +18,7 @@ def configure_logger(logger, name):
                     '_%s' % str(int(round(time.time()) % 1000000)) + \
                     '.log'
     print("Logging to %s" % log_filename)
+    # TODO: create directories if they don't already exist
     fh = logging.FileHandler(log_filename)
     fh.setLevel(logging.DEBUG)
     # create console handler with a higher log level

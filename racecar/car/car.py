@@ -18,7 +18,7 @@ class Car():
         self.num_directions = config.NUM_DIRECTIONS 
         self.num_speeds = config.NUM_SPEEDS
         
-    def restart(self, track, should_record):
+    def restart(self, track, should_record=False):
         self.location, self.direction = track.get_starting_position()
         self.speed = 1 # Default starting speed for this car type
         self.xy_step = None # cached x,y step tuple

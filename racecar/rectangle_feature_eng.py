@@ -4,14 +4,12 @@ Created on 14 Feb 2019
 @author: enerve
 '''
 
-import logging
 import math
 import torch
-import util
 
-from function import FeatureEng
+from .racecar_feature_eng import RacecarFeatureEng
 
-class RectangleFeatureEng(FeatureEng):
+class RectangleFeatureEng(RacecarFeatureEng):
     '''
     Feature engineering for States of rectangular track
     '''
@@ -26,18 +24,8 @@ class RectangleFeatureEng(FeatureEng):
                  corners = [],
                  include_bounded_features = False,
                  poly_degree = 1):
-        '''
-        Constructor
-        '''
-        
-        # states
-        self.num_junctures = config.NUM_JUNCTURES
-        self.num_lanes = config.NUM_LANES
-        self.num_directions = config.NUM_DIRECTIONS 
-        self.num_speeds = config.NUM_SPEEDS
-        # actions
-        self.num_steer_positions = config.NUM_STEER_POSITIONS
-        self.num_accel_positions = config.NUM_ACCEL_POSITIONS
+
+        super().__init__(config)
 
         # feature engineering options
         self.include_basis = include_basis
@@ -49,8 +37,6 @@ class RectangleFeatureEng(FeatureEng):
         self.include_bounded_features = include_bounded_features
         self.poly_degree = poly_degree
 
-        self.device = torch.device('cuda' if util.use_gpu else 'cpu')
-        
         # Hard-coded normalization params for the RaceCar state parameters        
         shift_list = []
         scale_list = []
@@ -102,9 +88,8 @@ class RectangleFeatureEng(FeatureEng):
         self.scale = torch.Tensor(scale_list).to(self.device)
         self.num_inputs = len(shift_list)
         
-    def num_actions(self):
-        return self.num_steer_positions * self.num_accel_positions
-        
+        self.teye = torch.eye(self.num_actions()).to(self.device)
+
     def prefix(self):
         return '%d%s%s%s%s' % (self.poly_degree,
                              't' if self.include_sin_cosine else 'f',
@@ -116,10 +101,12 @@ class RectangleFeatureEng(FeatureEng):
         return torch.randn(self.num_inputs ** self.poly_degree,
                            self.num_actions()).to(self.device)
 
-    def x_adjust(self, juncture, lane, speed, direction):
+    def x_adjust(self, S):
         ''' Takes the input params and converts it to an input feature array
         '''
 
+        juncture, lane, speed, direction = S
+        
         x_list = []
         
         if self.include_basis:
@@ -173,13 +160,4 @@ class RectangleFeatureEng(FeatureEng):
                     x = torch.ger(x, x).flatten()
     
             return x
-    
-    def a_index(self, a_tuple):
-        steer, accel = a_tuple
-        return self.num_accel_positions * steer + accel
-
-    def a_tuple(self, a_index):
-        return (a_index // self.num_accel_positions,
-                a_index % self.num_accel_positions)
-
 
