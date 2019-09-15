@@ -76,21 +76,26 @@ def main():
     
     NUM_NEW_EPISODES = 4000
     NUM_EPOCHS = 10
+    MAX_FA_ITERATIONS = 10000
     
     logger.debug("NUM_NEW_EPISODES=%d\t NUM_EPOCHS=%d", NUM_NEW_EPISODES, NUM_EPOCHS)
         
     episode_factory = EpisodeFactory(config, track, car)
 
-    rect_fe = RectangleFeatureEng(config)
+    rect_fe = RectangleFeatureEng(config,
+                                  include_splines=True,
+                                  spline_length=1)
         
     h1 = 2000
     h2 = 2000
     h3 = 2000
     default_net = nn.Sequential(
         nn.Linear(rect_fe.num_inputs, h1),
-        nn.Sigmoid(),
+        nn.LeakyReLU(),
+        nn.BatchNorm1d(h1),
         nn.Linear(h1, h2),
-        nn.Sigmoid(),
+        nn.LeakyReLU(),
+        nn.BatchNorm1d(h2),
 #         nn.Linear(h2, h3),
 #         nn.Sigmoid(),
         nn.Linear(h3, rect_fe.num_actions()))
@@ -99,10 +104,10 @@ def main():
     agent_fa = NN_FA(
         'mse',
         'adam',
-        0.000001, # alpha
-        0.001, # regularization constant
+        0.00001, # alpha
+        0.0001, # regularization constant
         512, # batch_size
-        4000, # max_iterations
+        MAX_FA_ITERATIONS, # max_iterations
         rect_fe)
 
     training_data_collector = FADataCollector(agent_fa)
@@ -120,8 +125,9 @@ def main():
     
     # ------------------ Training -------------------
 
-    test_agent = FAAgent(config, agent_fa)
-    evaluator = Evaluator(episode_factory, test_agent)
+    #test_agent = FAAgent(config, agent_fa)
+    test_agent = FAExplorer(config, ESBest(config, agent_fa))
+    evaluator = Evaluator(config, episode_factory, test_agent, agent_fa)
 
     if False: # to train/test without exploration and processing
         util.pre_agent_alg = agent_fa.prefix()
@@ -166,20 +172,17 @@ def main():
 #             # To start fresh but using existing episode history / exploration
 #             dir = "791563_Coindrop_DR_eesp_sarsa_lambda_g0.9_l0.95neural_bound_a0.002_r0.01_b512_i30000_FFEelv__NNconvnet_lookab5__"
 #             agent_fa.init_net(default_net)
-#             explorer.load_episode_history("agent", dir)
+#             explorer.load_episode_history("explorer", dir)
 #             es.load_exploration_state(dir)
 #             opponent.load_episode_history("opponent", dir)
-#         elif False:
-#             # To start training from where we last left off.
-#             # i.e., load episodes history, exploration state, and FA model
-#             #dir = "831321_Coindrop_DR_eesp_sarsa_lambda_g0.9_l0.95neural_bound_a0.002_r0.01_b512_i25000_FFEelv__NNconvnet_lookab5__"
-#             #dir = "789016_Coindrop_DR_eesp_sarsa_lambda_g0.9_l0.95neural_bound_a0.002_r0.01_b512_i8000_FFEelv__NNconvnet_lookab5__"
-#             dir = "178719_Coindrop_DR_eesp_sarsa_lambda_g0.9_l0.95neural_bound_a0.002_r0.001_b512_i150000_FFEelv__NNconvnet_lookab5__"
-#             explorer.load_episode_history("agent", dir)
-#             es.load_exploration_state(dir)
-#             opponent.load_episode_history("opponent", dir)
-#             agent_fa.load_model(dir, "v3")
-#             #trainer.load_stats(dir)
+        elif False:
+            # To start training from where we last left off.
+            # i.e., load episodes history, exploration state, and FA model
+            dir = "517637_RC2 rect_DR_elookup_q_lambda_g1.0_l0.80neural_a1e-06_r0.0001_b512_i50000_F1ffff_Cmse_Oadam__"
+            explorer.load_episode_history("explorer", dir)
+            es.load_exploration_state(dir)
+            agent_fa.load_model(dir, "v3")
+            trainer.load_stats(dir)
 #         elif False:
 #             # For single-epoch training/testing.
 #             # Load last training dataset and model, but not earlier history
@@ -211,18 +214,6 @@ def main():
         episode.report_history()
         episode.play_movie(show=True, pref="bestmovie")#pref="bestmovie_%s" % pref)
 
-    else: # load model, export to onnx
-        
-#         import onnx
-#         model = onnx.load("/home/erwin/MLData/RL/output/655236_Coindrop_DR_q_lambda_epat_l0.95neural_a0.0005_r0_b512_i1000_FFEv2__NNconvnetlook3__/coindropV2.onnx")
-#         onnx.checker.check_model(model)
-#         print(onnx.helper.printable_graph(model.graph))
-        
-        dir = "986337_Coindrop_DR_sarsa_lambda_eesp_l0.95neural_bound_a0.0005_r0.5_b512_i500_FBAM__NNconvnetlookab5__"
-        agent_fa.load_model(dir, "v3")
-        
-        agent_fa.export_to_onnx("v3")
-        #agent_fa.viz()
         
     
 if __name__ == '__main__':

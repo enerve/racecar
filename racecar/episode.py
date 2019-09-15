@@ -216,6 +216,17 @@ class Episode(Ep):
             ani.save(util.prefix() + pref + '.mp4', writer=writer)
         plt.close()
     
+    def path_image(self):
+        if not self.should_record:
+            return None
+
+        A = self.track.draw()
+        for pos in self.car.location_history:
+            loc, speed, dir = pos
+            self.car.draw(self.track.location_to_coordinates(loc), A)
+
+        return A
+
     def show_path(self, save=True, show=True, env2=None, pref=""):
         if not self.should_record:
             return

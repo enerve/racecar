@@ -36,6 +36,7 @@ class RacecarESLookup(ExplorationStrategy):
                            config.NUM_ACCEL_POSITIONS), dtype=np.int32)
         
         self.stats_a_count = np.zeros((3, 3))
+        self.stats_ba_count = np.zeros((3, 3))
 
     def prefix(self):
         return "lookup"
@@ -48,9 +49,11 @@ class RacecarESLookup(ExplorationStrategy):
         if random.random() >= epsilon:
             # Pick best
             action = self.fa.best_action(S)[0]
-            self.stats_a_count[action] += 1
+            self.stats_ba_count[action] += 1
         else:
             action = self.fa.random_action(S)
+
+        self.stats_a_count[action] += 1
         
         self.N[tuple(S)] += 1
 
@@ -58,6 +61,13 @@ class RacecarESLookup(ExplorationStrategy):
 
         return action
 
+    def collect_stats(self, ep):
+        if ep % 1000 == 0:
+            sum_ab = np.sum(self.stats_ba_count)
+            self.logger.debug("Best Action count:\n%s", self.stats_ba_count/sum_ab)
+
     def report_stats(self, pref=''):
-        sum = np.sum(self.stats_a_count)
-        self.logger.debug("Action count:\n%s", self.stats_a_count/sum)
+        sum_a = np.sum(self.stats_a_count)
+        self.logger.debug("Action count:\n%s", self.stats_a_count/sum_a)
+        sum_ab = np.sum(self.stats_ba_count)
+        self.logger.debug("Best Action count:\n%s", self.stats_ba_count/sum_ab)
