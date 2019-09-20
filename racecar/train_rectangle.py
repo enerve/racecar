@@ -13,6 +13,7 @@ import torch.nn as nn
 from really.epoch_trainer import EpochTrainer
 from really.agent import *
 from really.function import *
+from really.function.nn_model import NNModel
 from really import cmd_line
 from really import log
 from really import util
@@ -23,6 +24,7 @@ from racecar.episode_factory import EpisodeFactory
 from racecar.rectangle_feature_eng import RectangleFeatureEng
 from racecar.racecar_es_lookup import RacecarESLookup
 from racecar.racecar_explorer import RacecarExplorer
+from racecar.racecar_fa import RacecarFA
 from racecar.evaluator import Evaluator
 import racecar.trainer_helper as th
 
@@ -85,29 +87,18 @@ def main():
     rect_fe = RectangleFeatureEng(config,
                                   include_splines=True,
                                   spline_length=1)
-        
-    h1 = 2000
-    h2 = 2000
-    h3 = 2000
-    default_net = nn.Sequential(
-        nn.Linear(rect_fe.num_inputs, h1),
-        nn.LeakyReLU(),
-        nn.BatchNorm1d(h1),
-        nn.Linear(h1, h2),
-        nn.LeakyReLU(),
-        nn.BatchNorm1d(h2),
-#         nn.Linear(h2, h3),
-#         nn.Sigmoid(),
-        nn.Linear(h3, rect_fe.num_actions()))
-#     default_net = Net(4, 500, rect_fe.num_actions())
 
-    agent_fa = NN_FA(
-        'mse',
+    nn_model = NNModel(
+        'mse',  # TODO: send a complete gradient-generator
         'adam',
         0.00001, # alpha
         0.0001, # regularization constant
         512, # batch_size
-        MAX_FA_ITERATIONS, # max_iterations
+        MAX_FA_ITERATIONS)
+
+    agent_fa = RacecarFA(
+        config,
+        nn_model,
         rect_fe)
 
     training_data_collector = FADataCollector(agent_fa)
@@ -167,11 +158,12 @@ def main():
         
         if True:
             # To start training afresh 
-            agent_fa.init_net(default_net)
+            agent_fa.init_default_model()
+            
 #         elif False:
 #             # To start fresh but using existing episode history / exploration
 #             dir = "791563_Coindrop_DR_eesp_sarsa_lambda_g0.9_l0.95neural_bound_a0.002_r0.01_b512_i30000_FFEelv__NNconvnet_lookab5__"
-#             agent_fa.init_net(default_net)
+#             nn_model.init_net(default_net)
 #             explorer.load_episode_history("explorer", dir)
 #             es.load_exploration_state(dir)
 #             opponent.load_episode_history("opponent", dir)

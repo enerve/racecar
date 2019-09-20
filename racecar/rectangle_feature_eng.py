@@ -87,8 +87,6 @@ class RectangleFeatureEng(RacecarFeatureEng):
         self.shift = torch.Tensor(shift_list).to(self.device)
         self.scale = torch.Tensor(scale_list).to(self.device)
         self.num_inputs = len(shift_list)
-        
-        self.teye = torch.eye(self.num_actions()).to(self.device)
 
     def prefix(self):
         return '%d%s%s%s%s' % (self.poly_degree,
