@@ -10,7 +10,7 @@ from really import util
 
 from really.agent import FAExplorer
 
-class RacecarExplorer(FAExplorer):
+class Explorer(FAExplorer):
     '''
     A racecar driver that explores using the given exploration strategy,
     collecting experience data in the process.

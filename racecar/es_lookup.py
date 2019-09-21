@@ -9,7 +9,7 @@ import numpy as np
 import random
 from really.agent import ExplorationStrategy
 
-class RacecarESLookup(ExplorationStrategy):
+class ESLookup(ExplorationStrategy):
     '''
     Exploration strategy that uses a lookup table to store frequency of visits
     '''

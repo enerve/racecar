@@ -14,9 +14,10 @@ from really.function import ValueFunction
 from really import util
 from really.function.conv_net import AllSequential
 
-class RacecarFA(ValueFunction):
+class S_FA(ValueFunction):
     '''
-    An action-value function approximator for Racecar problem
+    An action-value function approximator for Racecar problem. Treats the
+    State as input and Action as output dimension.
     '''
 
     def __init__(self,

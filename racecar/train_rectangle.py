@@ -18,14 +18,7 @@ from really import cmd_line
 from really import log
 from really import util
 
-from racecar.car import Car
-from racecar.track import LineTrack
-from racecar.episode_factory import EpisodeFactory
-from racecar.rectangle_feature_eng import RectangleFeatureEng
-from racecar.racecar_es_lookup import RacecarESLookup
-from racecar.racecar_explorer import RacecarExplorer
-from racecar.racecar_fa import RacecarFA
-from racecar.evaluator import Evaluator
+from racecar import *
 import racecar.trainer_helper as th
 
 #from .net import Net
@@ -76,9 +69,9 @@ def main():
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     
-    NUM_NEW_EPISODES = 4000
-    NUM_EPOCHS = 10
-    MAX_FA_ITERATIONS = 10000
+    NUM_NEW_EPISODES = 400
+    NUM_EPOCHS = 2
+    MAX_FA_ITERATIONS = 100
     
     logger.debug("NUM_NEW_EPISODES=%d\t NUM_EPOCHS=%d", NUM_NEW_EPISODES, NUM_EPOCHS)
         
@@ -87,27 +80,36 @@ def main():
     rect_fe = RectangleFeatureEng(config,
                                   include_splines=True,
                                   spline_length=1)
+    rect_sa_fe = RectangleSAFeatureEng(config,
+                                  include_splines=True,
+                                  spline_length=1)
+    
+    fe = rect_sa_fe
 
     nn_model = NNModel(
         'mse',  # TODO: send a complete gradient-generator
         'adam',
-        0.00001, # alpha
-        0.0001, # regularization constant
+        0.0001, # alpha
+        0.1, # regularization constant
         512, # batch_size
         MAX_FA_ITERATIONS)
 
-    agent_fa = RacecarFA(
+#     agent_fa = S_FA(
+#         config,
+#         nn_model,
+#         fe)
+    agent_fa = SA_FA(
         config,
         nn_model,
-        rect_fe)
+        fe)
 
     training_data_collector = FADataCollector(agent_fa)
     validation_data_collector = FADataCollector(agent_fa)
 
-    es = RacecarESLookup(config,
+    es = ESLookup(config,
                   explorate=1300,
                   fa=agent_fa)
-    explorer = RacecarExplorer(config, es)
+    explorer = Explorer(config, es)
     
     learner = th.create_agent(config, 
                     alg = 'qlambda',
