@@ -13,14 +13,7 @@ from really import cmd_line
 from really import log
 from really import util
 
-from racecar.car import Car
-from racecar.track import CircleTrack
-from racecar.episode_factory import EpisodeFactory
-from racecar.circle_feature_eng import CircleFeatureEng
-from racecar.circle_sa_feature_eng import CircleSAFeatureEng
-from racecar.racecar_es_lookup import RacecarESLookup
-from racecar.racecar_explorer import RacecarExplorer
-from racecar.evaluator import Evaluator
+from racecar import *
 import racecar.trainer_helper as th
 
 import numpy as np
@@ -97,10 +90,10 @@ def main():
 #                     0.000, # dampen_by
 #                     circle_fe)
 
-    es = RacecarESLookup(config,
+    es = ESLookup(config,
                   explorate=70,
                   fa=agent_fa)
-    explorer = RacecarExplorer(config, es)
+    explorer = Explorer(config, es)
 
     learner = th.create_agent(config, 
                     alg = 'sarsalambda',
@@ -113,7 +106,7 @@ def main():
     # ------------------ Training -------------------
 
     test_agent = FAAgent(config, agent_fa)
-    evaluator = Evaluator(episode_factory, test_agent)
+    evaluator = Evaluator(config, episode_factory, test_agent, agent_fa)
 
     trainer = EpochTrainer(episode_factory, [explorer], learner, 
                            training_data_collector,
