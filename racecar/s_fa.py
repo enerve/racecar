@@ -10,9 +10,8 @@ import random
 import torch
 import torch.nn as nn
 
-from really.function import ValueFunction
+from really.function import ValueFunction, AllSequential
 from really import util
-from really.function.conv_net import AllSequential
 
 class S_FA(ValueFunction):
     '''
