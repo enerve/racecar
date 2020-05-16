@@ -14,6 +14,7 @@ from really.epoch_trainer import EpochTrainer
 from really.agent import *
 from really.function import *
 from really.function.nn_model import NNModel
+from really.policy import PolicyLearner, PolicyGrader
 from really import cmd_line
 from really import log
 from really import util
@@ -87,7 +88,15 @@ def main():
     fe = rect_sa_fe
 
     nn_model = NNModel(
-        'mse',  # TODO: send a complete gradient-generator
+        Grader('mse'),
+        'adam',
+        0.0001, # alpha
+        0.1, # regularization constant
+        512, # batch_size
+        MAX_FA_ITERATIONS)
+
+    pa_nn_model = NNModel(
+        PolicyGrader(),
         'adam',
         0.0001, # alpha
         0.1, # regularization constant
@@ -103,18 +112,22 @@ def main():
         nn_model,
         fe)
 
-    training_data_collector = FADataCollector(agent_fa)
-    validation_data_collector = FADataCollector(agent_fa)
+    training_data_collector = FADataCollector()
+    validation_data_collector = FADataCollector()
 
     es = ESLookup(config,
                   explorate=1300,
                   fa=agent_fa)
+    
+    explorer_pa = SA_PA(config, pa_nn_model, fe)
+    
     explorer = Explorer(config, es)
     
-    learner = th.create_agent(config, 
+    fa_learner = th.create_agent(config, 
                     alg = 'qlambda',
                     lam = 0.8,
                     fa=agent_fa)
+    pa_learner = PolicyLearner(explorer_pa, agent_fa)
     
     # ------------------ Training -------------------
 
@@ -152,11 +165,12 @@ def main():
     
     elif True: # If Run episodes
         
-        trainer = EpochTrainer(episode_factory, [explorer], learner, 
+        trainer = EpochTrainer(episode_factory, [explorer], fa_learner, 
+                               pa_learner,
                                training_data_collector,
                                validation_data_collector,
                                evaluator,
-                               explorer.prefix() + "_" + learner.prefix())
+                               explorer.prefix() + "_" + fa_learner.prefix())
         
         if True:
             # To start training afresh 
