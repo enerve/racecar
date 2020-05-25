@@ -162,9 +162,11 @@ class S_FA(ValueFunction):
         
         SHX = torch.stack(steps_history_x)
         SHT = torch.tensor(steps_history_t)
+        SHT = torch.unsqueeze(SHT, 1).float()
         SHM = torch.stack(steps_history_m)
         VSHX = torch.stack(val_steps_history_x)
         VSHT = torch.tensor(val_steps_history_t)
+        VSHT = torch.unsqueeze(VSHT, 1).float()
         VSHM = torch.stack(val_steps_history_m)
 
         self.model.train(SHX, SHT, SHM, VSHX, VSHT, VSHM)

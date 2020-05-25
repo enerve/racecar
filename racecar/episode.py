@@ -182,7 +182,7 @@ class Episode(Ep):
         self.logger.info("  AccelsA: %s", [a[1] for a in self.car.action_history])
         self.logger.info("  Total time taken: %d", self.curr_time)
 
-    def play_movie(self, save=True, show=True, pref=""):
+    def play_movie(self, save=False, show=True, pref=""):
         if not self.should_record:
             return
 

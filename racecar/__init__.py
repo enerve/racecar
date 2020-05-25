@@ -16,6 +16,7 @@ from racecar.es_lookup import ESLookup
 from racecar.explorer import Explorer
 from racecar.s_fa import S_FA
 from racecar.sa_fa import SA_FA
+from racecar.sa_pa import SA_PA
 from racecar.evaluator import Evaluator
 
 __all__ = ["Car",
@@ -30,4 +31,5 @@ __all__ = ["Car",
            "Explorer",
            "S_FA",
            "SA_FA",
+           "SA_PA",
            "Evaluator"]

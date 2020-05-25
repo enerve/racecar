@@ -10,13 +10,12 @@ import random
 import torch
 import torch.nn as nn
 
-from really.function import ValueFunction, AllSequential
 from really import util
+from really.function import AllSequential, GivenGradient, LinearForward
 
-class SA_FA(ValueFunction):
+class SA_PA():  #TODO: should this in fact extend from ES?
     '''
-    An action-value function approximator for Racecar problem. Treats both
-    State and Action as input.
+    A policy approximator for Racecar problem. Tests
     '''
 
     def __init__(self,
@@ -29,7 +28,7 @@ class SA_FA(ValueFunction):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
 
-        self.logger.debug("Racecar SA FA")
+        self.logger.debug("Racecar SA PA")
 
         # actions
         self.num_steer_positions = config.NUM_STEER_POSITIONS
@@ -62,38 +61,66 @@ class SA_FA(ValueFunction):
             ('2bn', nn.BatchNorm1d(B)),
     #         nn.Linear(h2, h3),
     #         nn.Sigmoid(),
-            ('3lin', nn.Linear(C, self.num_outputs())),
+            #('3lin', nn.Linear(C, self.num_outputs())),
+            ('features', nn.Sequential()), # NOOP
+            ('lfgg', LinearForward(B)),
             ]))
     
         self.model.init_net(net)
 
     # ------- Running --------
 
-    def _value(self, state, action):
-        X = self.feature_eng.x_adjust(state, action)
-        output = self.model.value(X.unsqueeze(0))[0]
-        return output
-    
-    def value(self, state, action):
-        output = self._value(state, action)
-        return output[0].item()
+#     def _value(self, state, action):
+#         X = self.feature_eng.x_adjust(state, action)
+#         output = self.model.value(X.unsqueeze(0))[0]
+#         return output
+#
+#     def value(self, state, action):
+#         output = self._value(state, action)
+#         return output[0].item()
 
     def values(self, state):
         x_list = [self.feature_eng.x_adjust(state, a) for a in self.valid_actions]
         Xb = torch.stack(x_list).to(self.device)
-        output = self.model.value(Xb)
-        return output
+        output, activations = self.model.all_values(Xb)
+        output = output[0]
+        activations['lfgg'] = activations['lfgg'][0]
+        # Convert to probabilities across all valid actions. Softmax for now.
+        output = torch.nn.functional.softmax(output, dim=0)
+        # TODO: can i return only output, and avoid the others?
+        #       can i also return maybe a list instead of 2d torch?
+        return output, activations, self.valid_actions
+    
+#     def encoding_vectors(self, state):
+#         _, activations, _ = self.values(state)
+#         return activations['2bn']
 
-    def best_action(self, state):
-        V = self.values(state)
-        i = torch.argmax(V).item()
-        v = V[i].item()
-        return self.action_from_index(i), v, V.tolist()
+#    def best_action(self, state):
+#        V = self.values(state) #TODO: doesn't look right
+#        i = torch.argmax(V).item()
+#        v = V[i].item()
+#        return self.action_from_index(i), v, V.tolist()
 
-    def random_action(self, state):
-        r = random.randrange(
-            self.num_steer_positions * self.num_accel_positions)
-        return self.action_from_index(r)
+#     def random_action(self, state):
+#         r = random.randrange(
+#             self.num_steer_positions * self.num_accel_positions)
+#         return self.action_from_index(r)
+
+    def pick_action(self, state):
+        vals, _, actions = self.values(state)
+        action_probs = vals[:, 0].tolist()
+        
+        r = random.random()
+        p = 0
+        for a, prob in zip(actions, action_probs):
+            p += prob
+            if p > r:
+                picked_a = a
+                break
+        else:
+            picked_a = self.valid_actions[-1]
+
+        return picked_a, action_probs
 
     def num_outputs(self):
         return 1
@@ -119,22 +146,21 @@ class SA_FA(ValueFunction):
         self.test()
 
     def _prepare_data(self, steps_history_state, steps_history_action,
-                      steps_history_target):
+                      steps_history_gradient):
         steps_history_x = []
-        steps_history_t = []
+        steps_history_g = []
         steps_history_mask = []
 
         #Sdict = {}
         #count_conflict = 0
         self.logger.debug("  Preparing for %d items", len(steps_history_state))
 
-        #teye = torch.eye(self.num_outputs()).to(self.device)
         teye = torch.ones(1).to(self.device)
         
-        for i, (S, a, t) in enumerate(zip(
+        for i, (S, a, g) in enumerate(zip(
                         steps_history_state,
                         steps_history_action,
-                        steps_history_target)):
+                        steps_history_gradient)):
             if i == 250000:
                 self.logger.warning("------ too much to prepare ----------")
                 break
@@ -143,7 +169,7 @@ class SA_FA(ValueFunction):
             m = teye.clone() # Not ideal but allows flexibility in nn model
 
             steps_history_x.append(x)
-            steps_history_t.append(t)
+            steps_history_g.append(g)
             steps_history_mask.append(m)
 
             if (i+1) % 10000 == 0:
@@ -152,7 +178,7 @@ class SA_FA(ValueFunction):
             
         #util.hist(list(Sdict.values()), bins=100, range=(2,50))
         
-        return steps_history_x, steps_history_t, steps_history_mask
+        return steps_history_x, steps_history_g, steps_history_mask
 
 
     def _sample_ids(self, l, n):
@@ -162,22 +188,20 @@ class SA_FA(ValueFunction):
 
     def train(self, training_data_collector, validation_data_collector):
         self.logger.debug("Preparing training data--")
-        steps_history_x, steps_history_t, steps_history_m = \
+        steps_history_x, steps_history_g, steps_history_m = \
             self._prepare_data(*training_data_collector.get_data())
         self.logger.debug("Preparing validation data--")
-        val_steps_history_x, val_steps_history_t, val_steps_history_m = \
+        val_steps_history_x, val_steps_history_g, val_steps_history_m = \
             self._prepare_data(*validation_data_collector.get_data())
         
         SHX = torch.stack(steps_history_x)
-        SHT = torch.tensor(steps_history_t)
-        SHT = torch.unsqueeze(SHT, 1).float()
+        SHG = torch.stack(steps_history_g).float()
         SHM = torch.stack(steps_history_m)
         VSHX = torch.stack(val_steps_history_x)
-        VSHT = torch.tensor(val_steps_history_t)
-        VSHT = torch.unsqueeze(VSHT, 1).float()
+        VSHG = torch.stack(val_steps_history_g).float()
         VSHM = torch.stack(val_steps_history_m)
 
-        self.model.train(SHX, SHT, SHM, VSHX, VSHT, VSHM)
+        self.model.train(SHX, SHG, SHM, VSHX, VSHG, VSHM)
 
     def test(self):
         pass

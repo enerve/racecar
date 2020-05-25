@@ -12,8 +12,10 @@ import torch.nn as nn
 
 from really.epoch_trainer import EpochTrainer
 from really.agent import *
+from really.agent import ESPolicy
 from really.function import *
 from really.function.nn_model import NNModel
+from really.policy import PolicyLearner, PolicyGrader
 from really import cmd_line
 from really import log
 from really import util
@@ -69,10 +71,11 @@ def main():
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     
-    NUM_NEW_EPISODES = 400
+    NUM_NEW_EPISODES = 100
     NUM_EPOCHS = 2
-    MAX_FA_ITERATIONS = 100
-    
+    MAX_FA_ITERATIONS = 200
+    MAX_PA_ITERATIONS = 20
+
     logger.debug("NUM_NEW_EPISODES=%d\t NUM_EPOCHS=%d", NUM_NEW_EPISODES, NUM_EPOCHS)
         
     episode_factory = EpisodeFactory(config, track, car)
@@ -87,7 +90,7 @@ def main():
     fe = rect_sa_fe
 
     nn_model = NNModel(
-        'mse',  # TODO: send a complete gradient-generator
+        Grader('mse'),
         'adam',
         0.0001, # alpha
         0.1, # regularization constant
@@ -103,23 +106,38 @@ def main():
         nn_model,
         fe)
 
-    training_data_collector = FADataCollector(agent_fa)
-    validation_data_collector = FADataCollector(agent_fa)
+    training_data_collector = FADataCollector()
+    validation_data_collector = FADataCollector()
 
-    es = ESLookup(config,
-                  explorate=1300,
-                  fa=agent_fa)
+    # es = ESLookup(config,
+    #               explorate=1300,
+    #               fa=agent_fa)
+
+    pa_nn_model = NNModel(
+        PolicyGrader(),
+        'adam',
+        0.0001, # alpha
+        0.1, # regularization constant
+        512, # batch_size
+        MAX_PA_ITERATIONS)
+
+    sa_pa = SA_PA(config, pa_nn_model, fe)
+    es = ESPolicy(config,
+                  fa=agent_fa,
+                  pa=sa_pa)
+
     explorer = Explorer(config, es)
     
-    learner = th.create_agent(config, 
+    fa_learner = th.create_agent(config, 
                     alg = 'qlambda',
                     lam = 0.8,
                     fa=agent_fa)
+    pa_learner = PolicyLearner(sa_pa, agent_fa)
     
     # ------------------ Training -------------------
 
     #test_agent = FAAgent(config, agent_fa)
-    test_agent = FAExplorer(config, ESBest(config, agent_fa))
+    test_agent = FAExplorer(config, ESBest(config, agent_fa)) #TODO: should be pa-based best
     evaluator = Evaluator(config, episode_factory, test_agent, agent_fa)
 
     if False: # to train/test without exploration and processing
@@ -152,15 +170,17 @@ def main():
     
     elif True: # If Run episodes
         
-        trainer = EpochTrainer(episode_factory, [explorer], learner, 
+        trainer = EpochTrainer(episode_factory, [explorer], fa_learner, 
+                               pa_learner,
                                training_data_collector,
                                validation_data_collector,
                                evaluator,
-                               explorer.prefix() + "_" + learner.prefix())
+                               explorer.prefix() + "_" + fa_learner.prefix())
         
         if True:
             # To start training afresh 
             agent_fa.init_default_model()
+            sa_pa.init_default_model()
             
 #         elif False:
 #             # To start fresh but using existing episode history / exploration
